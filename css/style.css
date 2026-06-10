@@ -30,8 +30,12 @@
   --transition-fast: 0.15s ease;
   --transition-normal: 0.25s cubic-bezier(0.4,0,0.2,1);
   --header-height: 64px;
-  --mobile-nav-height: 64px;
+  --mobile-nav-height: 0px;
   --sidebar-width: 0px;
+}
+/* On mobile, activate bottom nav height */
+@media (max-width: 768px) {
+  :root { --mobile-nav-height: 64px; }
 }
 
 /* Dark Mode */
@@ -61,9 +65,10 @@ body {
   color: var(--text-main);
   min-height: 100vh;
   transition: background-color var(--transition-normal), color var(--transition-normal);
-  overflow-x: hidden;
   -webkit-tap-highlight-color: transparent;
 }
+/* overflow-x on html prevents horizontal scroll without breaking fixed children */
+html { overflow-x: hidden; }
 a { text-decoration: none; color: inherit; }
 button, input, select, textarea { font-family: inherit; font-size: inherit; color: inherit; }
 h1,h2,h3,h4,h5,h6 { font-weight: 700; line-height: 1.25; letter-spacing: -0.02em; }
@@ -157,7 +162,7 @@ body.dark-mode .brand-name {
   height: var(--mobile-nav-height);
   background-color: var(--bg-surface); border-top: 1px solid var(--border-color);
   box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
-  display: none; grid-template-columns: repeat(5,1fr); z-index: 100;
+  display: none; grid-template-columns: repeat(5,1fr); z-index: 110;
   padding-bottom: env(safe-area-inset-bottom);
   transition: background-color var(--transition-normal), border-color var(--transition-normal);
 }
@@ -534,6 +539,11 @@ textarea.form-input { resize: vertical; }
   .grading-compare { grid-template-columns: 1fr; }
 
   .custom-table th, .custom-table td { padding: 0.7rem 0.75rem; font-size: 0.85rem; }
+
+  /* Make sure dashboard bottom cards don't grow too tall on mobile */
+  #pending-correction-table thead tr th:nth-child(3),
+  #pending-correction-table tbody tr td:nth-child(3) { display: none; }
+
 }
 
 /* =============================================
@@ -712,4 +722,72 @@ textarea.form-input { resize: vertical; }
 @media (max-width: 480px) {
   .q-compact-header { gap: 0.3rem; }
   .builder-header-compact .bulk-generate-wrapper { flex-wrap: wrap; gap: 0.3rem; }
+}
+
+/* =============================================
+   DASHBOARD BOTTOM CARDS — COMPACT & EQUAL HEIGHT
+   ============================================= */
+#view-dashboard .grid-cols-2.mt-4 {
+  align-items: start;
+}
+#view-dashboard .grid-cols-2.mt-4 .card {
+  max-height: 320px;
+  display: flex;
+  flex-direction: column;
+}
+#view-dashboard .grid-cols-2.mt-4 .table-container {
+  overflow-y: auto;
+  max-height: 230px;
+  flex: 1;
+}
+/* On mobile, stack and constrain height more */
+@media (max-width: 768px) {
+  #view-dashboard .grid-cols-2.mt-4 .card {
+    max-height: 260px;
+  }
+  #view-dashboard .grid-cols-2.mt-4 .table-container {
+    max-height: 180px;
+  }
+}
+
+/* =============================================
+   MOBILE CLICK & TOUCH FIXES
+   ============================================= */
+
+/* Ensure bottom nav is always rendered above all page content */
+.bottom-nav {
+  isolation: isolate;
+}
+
+/* Toast should sit above bottom nav on mobile */
+/* Mobile toast is positioned via JS using CSS var --mobile-nav-height */
+
+/* Fix: main-container must NOT create a new stacking context that traps fixed children */
+.main-container {
+  position: static;
+}
+
+/* Ensure filter-bar buttons are always tappable (min touch target 44px) */
+.filter-bar .btn,
+.card-title-container .btn {
+  min-height: 36px;
+  position: relative;
+  z-index: 1;
+}
+
+/* Prevent stat cards overflow:hidden from eating sibling click areas */
+.stat-card {
+  overflow: visible;
+}
+
+/* Settings logout button — ensure it's reachable on small screens */
+#btn-logout-settings {
+  position: relative;
+  z-index: 1;
+}
+
+/* Header action buttons — ensure tap area is sufficient */
+.header-actions .action-btn {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: rgba(0,0,0,0.1);
 }

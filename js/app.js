@@ -365,7 +365,7 @@ class KoreksiSoalApp {
     const colors = { info: '#3b82f6', success: '#22c55e', error: '#ef4444', warning: '#f59e0b' };
     const toast = document.createElement('div');
     toast.style.cssText = `
-      position:fixed; bottom:1.5rem; right:1.5rem; z-index:99998;
+      position:fixed; bottom:calc(var(--mobile-nav-height, 0px) + 1.25rem + env(safe-area-inset-bottom, 0px)); right:1.25rem; z-index:99998;
       background:${colors[type] || colors.info}; color:white;
       padding:0.75rem 1.25rem; border-radius:0.5rem; font-size:0.875rem;
       font-weight:600; box-shadow:0 4px 16px rgba(0,0,0,0.2);

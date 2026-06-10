@@ -475,23 +475,23 @@
             </div>
           </div>
           <div class="questions-builder-container">
-            <div class="builder-header">
-              <h4>Daftar Soal & Kunci Jawaban</h4>
+            <div class="builder-header-compact">
+              <span class="builder-title-label"><i data-lucide="list"></i> Soal &amp; Kunci Jawaban</span>
               <div class="bulk-generate-wrapper">
-                <input type="number" id="bulk-question-count" class="form-input" min="1" max="100" placeholder="Jml Soal" style="width:90px;">
-                <select id="bulk-question-type" class="form-input" style="width:auto; font-size:0.85rem;">
-                  <option value="PG">Pilihan Ganda</option>
-                  <option value="PGK">PG Kompleks</option>
-                  <option value="BS">Benar / Salah</option>
+                <input type="number" id="bulk-question-count" class="form-input" min="1" max="100" placeholder="Jml" style="width:60px;padding:0.4rem 0.5rem;font-size:0.82rem;">
+                <select id="bulk-question-type" class="form-input" style="width:auto;font-size:0.8rem;padding:0.4rem 0.5rem;">
+                  <option value="PG">PG</option>
+                  <option value="PGK">PGK</option>
+                  <option value="BS">B/S</option>
                   <option value="ES">Esai</option>
                 </select>
-                <button type="button" class="btn btn-secondary btn-sm" id="btn-bulk-generate-questions">Buat Sekaligus</button>
+                <button type="button" class="btn btn-secondary btn-sm" id="btn-bulk-generate-questions" title="Buat soal sekaligus"><i data-lucide="plus-square"></i> Generate</button>
               </div>
             </div>
-            <div id="modal-questions-list" style="display:flex;flex-direction:column;gap:1rem;max-height:380px;overflow-y:auto;padding:0.5rem;"></div>
+            <div id="modal-questions-list" style="display:flex;flex-direction:column;gap:0.5rem;max-height:340px;overflow-y:auto;padding:0.25rem 0;"></div>
             <div class="weight-sum-indicator">
-              <span>Total Bobot: <span id="form-total-weight">0</span> / 100</span>
-              <span id="weight-validation-status" style="font-size:0.85rem;"></span>
+              <span>Total Bobot: <strong id="form-total-weight">0</strong> / 100</span>
+              <span id="weight-validation-status" style="font-size:0.82rem;"></span>
             </div>
           </div>
         </form>
@@ -549,62 +549,47 @@
 
   <!-- C. CORRECTION MODAL -->
   <div class="modal-overlay" id="correction-modal">
-    <div class="modal-content" style="max-width:950px;max-height:95vh;">
-      <div class="modal-header">
-        <div>
-          <h3 id="correction-modal-title">Koreksi Lembar Jawaban</h3>
-          <p class="text-muted" id="correction-modal-subtitle" style="font-size:0.85rem;margin-top:0.25rem;"></p>
+    <div class="modal-content" style="max-width:680px;max-height:95vh;">
+      <div class="modal-header" style="padding:0.85rem 1.1rem;">
+        <div style="min-width:0;flex:1;">
+          <h3 id="correction-modal-title" style="font-size:1rem;">Koreksi Lembar Jawaban</h3>
+          <p class="text-muted" id="correction-modal-subtitle" style="font-size:0.75rem;margin-top:0.15rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></p>
         </div>
         <button class="action-btn" id="close-correction-modal"><i data-lucide="x"></i></button>
       </div>
 
-      <!-- BODY: dua kolom — kiri daftar soal, kanan editor jawaban siswa -->
-      <div class="modal-body" style="background-color:var(--bg-base);">
-        <div class="correction-split-container">
-
-          <!-- Kiri: daftar soal & analisis -->
-          <div style="max-height:60vh;overflow-y:auto;padding-right:0.5rem;" id="correction-questions-list"></div>
-
-          <!-- Kanan: editor jawaban siswa saja (ringkasan dipindah ke footer) -->
-          <div class="card" style="padding:1.25rem;display:flex;flex-direction:column;gap:0;">
-            <h4 class="mb-4" style="font-size:0.9rem;">Perbaiki Jawaban Siswa</h4>
-            <p class="text-muted" style="font-size:0.75rem;margin-bottom:1rem;">Ganti jawaban yang keliru — nilai dihitung ulang otomatis.</p>
-            <div style="overflow-y:auto;flex:1;max-height:calc(60vh - 90px);display:flex;flex-direction:column;gap:0.75rem;" id="correction-answer-editors"></div>
-          </div>
-
+      <!-- SCORE STRIP -->
+      <div class="correction-score-strip">
+        <div class="score-strip-main">
+          <span id="correction-summary-total" class="score-strip-value">0</span>
+          <span class="score-strip-slash">/ 100</span>
+        </div>
+        <div class="score-strip-stats">
+          <span id="correction-summary-count">-</span>
+          <span class="score-strip-correct" id="correction-summary-correct">-</span>
+          <span class="score-strip-wrong" id="correction-summary-wrong">-</span>
+        </div>
+        <div class="score-strip-status">
+          <label>Status:</label>
+          <select id="correction-form-status" class="form-input" style="padding:0.25rem 0.5rem;font-size:0.8rem;font-weight:700;width:auto;">
+            <option value="Belum">Belum</option>
+            <option value="Proses">Proses</option>
+            <option value="Selesai">Selesai</option>
+          </select>
         </div>
       </div>
 
-      <!-- FOOTER: Ringkasan ringkas + Status + tombol aksi -->
-      <div class="modal-footer" style="flex-wrap:wrap;gap:0.75rem;align-items:center;">
+      <!-- UNIFIED QUESTION CARDS -->
+      <div class="modal-body" style="padding:0.75rem;background-color:var(--bg-base);">
+        <div id="correction-unified-list" style="display:flex;flex-direction:column;gap:0.6rem;"></div>
+        <!-- legacy containers kept hidden for JS compatibility -->
+        <div id="correction-questions-list" style="display:none;"></div>
+        <div id="correction-answer-editors" style="display:none;"></div>
+      </div>
 
-        <!-- Ringkasan mini di kiri footer -->
-        <div style="display:flex;align-items:center;gap:1.25rem;flex:1;min-width:0;flex-wrap:wrap;">
-          <div style="display:flex;align-items:baseline;gap:0.3rem;">
-            <span style="font-size:1.7rem;font-weight:800;color:var(--primary);" id="correction-summary-total">0</span>
-            <span style="font-size:0.75rem;color:var(--text-muted);">/ 100</span>
-          </div>
-          <div style="display:flex;gap:0.75rem;font-size:0.78rem;flex-wrap:wrap;">
-            <span id="correction-summary-count" style="color:var(--text-muted);">-</span>
-            <span style="color:var(--success);font-weight:600;" id="correction-summary-correct">-</span>
-            <span style="color:var(--danger);font-weight:600;" id="correction-summary-wrong">-</span>
-          </div>
-          <div style="display:flex;align-items:center;gap:0.5rem;">
-            <label style="font-size:0.78rem;color:var(--text-muted);white-space:nowrap;">Status:</label>
-            <select id="correction-form-status" class="form-input" style="padding:0.3rem 0.6rem;font-size:0.82rem;font-weight:700;width:auto;">
-              <option value="Belum">Belum</option>
-              <option value="Proses">Proses</option>
-              <option value="Selesai">Selesai</option>
-            </select>
-          </div>
-        </div>
-
-        <!-- Tombol aksi di kanan -->
-        <div style="display:flex;gap:0.5rem;flex-shrink:0;">
-          <button class="btn btn-secondary" id="cancel-correction-modal">Batal</button>
-          <button class="btn btn-primary" id="save-correction-btn"><i data-lucide="save"></i> Simpan Koreksi</button>
-        </div>
-
+      <div class="modal-footer" style="padding:0.75rem 1rem;">
+        <button class="btn btn-secondary btn-sm" id="cancel-correction-modal">Batal</button>
+        <button class="btn btn-primary btn-sm" id="save-correction-btn"><i data-lucide="save"></i> Simpan Koreksi</button>
       </div>
     </div>
   </div>

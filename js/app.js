@@ -930,35 +930,25 @@ class KoreksiSoalApp {
     }
 
     rowDiv.innerHTML = `
-      <div class="q-number-badge">${index}</div>
-      <div class="q-content-inputs">
-        <div class="form-row" style="grid-template-columns: 2fr 1fr 1fr;">
-          <div class="form-group" style="margin-bottom:0;">
-            <input type="text" class="form-input q-text-input" value="${text}" placeholder="Teks soal (opsional — boleh dikosongkan)">
-          </div>
-          <div class="form-group" style="margin-bottom:0;">
-            <select class="form-input q-type-select" onchange="app.handleQuestionTypeChange(${index}, this.value)">
-              <option value="PG" ${type === 'PG' ? 'selected' : ''}>Pilihan Ganda</option>
-              <option value="PGK" ${type === 'PGK' ? 'selected' : ''}>PG Kompleks</option>
-              <option value="BS" ${type === 'BS' ? 'selected' : ''}>Benar / Salah</option>
-              <option value="ES" ${type === 'ES' ? 'selected' : ''}>Esai (Essay)</option>
-            </select>
-          </div>
-          <div class="form-group" style="margin-bottom:0; flex-direction:row; align-items:center; gap:0.5rem;">
-            <label style="font-size:0.8rem; font-weight:700;">Bobot:</label>
-            <input type="number" class="form-input q-weight-input" value="${weight}" min="1" max="100" oninput="app.calculateFormWeights()" required style="width:70px;">
-            <button type="button" class="btn btn-secondary btn-icon-only btn-sm" onclick="app.deleteQuestionRow(${index})" style="border-color:var(--danger); border-radius:var(--radius-sm);">
-              <i data-lucide="trash-2" style="width:14px; height:14px; color:var(--danger);"></i>
-            </button>
-          </div>
+      <div class="q-compact-header">
+        <span class="q-number-badge">${index}</span>
+        <select class="form-input q-type-select" onchange="app.handleQuestionTypeChange(${index}, this.value)" style="flex:1;max-width:100px;padding:0.3rem 0.4rem;font-size:0.78rem;">
+          <option value="PG" ${type === 'PG' ? 'selected' : ''}>PG</option>
+          <option value="PGK" ${type === 'PGK' ? 'selected' : ''}>PGK</option>
+          <option value="BS" ${type === 'BS' ? 'selected' : ''}>B/S</option>
+          <option value="ES" ${type === 'ES' ? 'selected' : ''}>Esai</option>
+        </select>
+        <div class="q-weight-group">
+          <span style="font-size:0.72rem;font-weight:700;white-space:nowrap;">Bobot</span>
+          <input type="number" class="form-input q-weight-input" value="${weight}" min="1" max="100" oninput="app.calculateFormWeights()" required style="width:50px;padding:0.3rem 0.4rem;font-size:0.82rem;text-align:center;">
         </div>
-        
-        <div class="form-group" style="margin-bottom:0;">
-          <label class="form-label" style="font-size:0.75rem;">Kunci Jawaban:</label>
-          <div class="key-wrapper-div" id="key-wrapper-${index}">
-            ${keyHtml}
-          </div>
-        </div>
+        <button type="button" class="btn btn-secondary btn-icon-only btn-sm q-delete-btn" onclick="app.deleteQuestionRow(${index})" title="Hapus soal">
+          <i data-lucide="trash-2" style="width:13px;height:13px;color:var(--danger);"></i>
+        </button>
+      </div>
+      <input type="text" class="form-input q-text-input" value="${text}" placeholder="Teks soal (opsional)" style="font-size:0.82rem;padding:0.35rem 0.6rem;margin:0.3rem 0;">
+      <div class="key-wrapper-div" id="key-wrapper-${index}">
+        ${keyHtml}
       </div>
     `;
 
@@ -1530,11 +1520,12 @@ class KoreksiSoalApp {
     // Store context for saving
     this.activeCorrectionSubId = submissionId;
 
-    // Render Side-by-Side Analysis on left
+    // Render unified per-question cards
+    const unifiedContainer = document.getElementById('correction-unified-list');
+    if (unifiedContainer) unifiedContainer.innerHTML = '';
+    // keep legacy containers empty (hidden)
     const qListContainer = document.getElementById('correction-questions-list');
     qListContainer.innerHTML = '';
-
-    // Render direct answer inputs on right
     const editorsContainer = document.getElementById('correction-answer-editors');
     editorsContainer.innerHTML = '';
 
@@ -1546,160 +1537,131 @@ class KoreksiSoalApp {
       const studAns = currentAnswers[q.id];
       const correctKey = q.key;
       
-      // Auto-grader suggestions
       let isCorrect = false;
       let calculatedScore = 0;
-      let matchInfo = '';
+      let matchInfoHtml = '';
 
       if (q.type === 'PG') {
         isCorrect = studAns === correctKey;
         calculatedScore = isCorrect ? q.weight : 0;
       } else if (q.type === 'PGK') {
-        // PGK evaluation (Partial matching formula)
         const sKeys = Array.isArray(studAns) ? studAns : [];
         const cKeys = Array.isArray(correctKey) ? correctKey : [];
-        
-        // Exact match
         const exact = sKeys.length === cKeys.length && sKeys.every(k => cKeys.includes(k));
         if (exact) {
-          calculatedScore = q.weight;
-          isCorrect = true;
+          calculatedScore = q.weight; isCorrect = true;
         } else {
-          // Partial: correct choices - wrong choices
           const correctChosen = sKeys.filter(k => cKeys.includes(k)).length;
           const wrongChosen = sKeys.filter(k => !cKeys.includes(k)).length;
           const portion = cKeys.length > 0 ? (correctChosen - wrongChosen) / cKeys.length : 0;
           calculatedScore = Math.max(0, parseFloat((portion * q.weight).toFixed(1)));
           isCorrect = calculatedScore === q.weight;
         }
-        matchInfo = `Cocok: ${sKeys.filter(k => cKeys.includes(k)).join(', ')}`;
+        const sKeys2 = Array.isArray(studAns) ? studAns : [];
+        const cKeys2 = Array.isArray(correctKey) ? correctKey : [];
+        matchInfoHtml = sKeys2.length ? `<span class="keyword-match-hint">Cocok: ${sKeys2.filter(k=>cKeys2.includes(k)).join(', ')||'-'}</span>` : '';
       } else if (q.type === 'BS') {
-        // Normalize both to lowercase for comparison (handles legacy 'BENAR'/'SALAH' keys)
         const normStudAns = (studAns || '').toLowerCase();
         const normCorrectKey = (correctKey || '').toLowerCase();
         isCorrect = normStudAns !== '' && normStudAns === normCorrectKey;
         calculatedScore = isCorrect ? q.weight : 0;
       } else if (q.type === 'ES') {
-        // Essay key matches
         const tags = correctKey.split(',').map(t => t.trim().toLowerCase()).filter(t => t);
         const textLower = (studAns || '').toLowerCase();
         let matches = [];
-        
         if (tags.length > 0) {
-          tags.forEach(tag => {
-            if (textLower.includes(tag)) {
-              matches.push(tag);
-            }
-          });
-          // Recommended: matched / total
+          tags.forEach(tag => { if (textLower.includes(tag)) matches.push(tag); });
           const portion = matches.length / tags.length;
           calculatedScore = Math.round(portion * q.weight);
-          matchInfo = matches.length > 0 
-            ? `<div class="keyword-match-hint"><i data-lucide="check" style="width:12px; height:12px;"></i>Cocok Kata Kunci: ${matches.join(', ')} (${matches.length}/${tags.length})</div>`
-            : '<div class="keyword-match-hint" style="color:var(--danger);"><i data-lucide="x" style="width:12px; height:12px;"></i>Tidak ada kata kunci cocok</div>';
+          matchInfoHtml = matches.length > 0
+            ? `<span class="keyword-match-hint"><i data-lucide="check" style="width:11px;height:11px;"></i> ${matches.join(', ')} (${matches.length}/${tags.length})</span>`
+            : `<span class="keyword-match-hint" style="color:var(--danger);">Tidak ada kata kunci cocok</span>`;
         } else {
-          calculatedScore = 0;
-          matchInfo = '<div class="keyword-match-hint" style="color:var(--warning);">Tidak ada kata kunci yang diset guru.</div>';
+          matchInfoHtml = `<span class="keyword-match-hint" style="color:var(--warning);">Belum ada kata kunci</span>`;
         }
       }
 
-      // If submission was already graded, load saved scores instead of auto-calculated
       const finalScore = (submission.status !== 'Belum' && submission.scores[q.id] !== undefined)
-        ? submission.scores[q.id]
-        : calculatedScore;
+        ? submission.scores[q.id] : calculatedScore;
 
-      // 1. Render Left panel card (Analysis & Score inputs)
-      const isCorrectStyle = (q.type !== 'ES')
-        ? (isCorrect ? 'border-color:var(--success);' : 'border-color:var(--danger);')
-        : 'border-color:var(--border-color);';
+      // Validation state
+      const isES = q.type === 'ES';
+      const validState = isES ? 'esai' : (isCorrect ? 'correct' : 'wrong');
+      const badgeHtml = isES
+        ? '<span class="corr-badge corr-badge-esai">Esai</span>'
+        : (isCorrect
+          ? '<span class="corr-badge corr-badge-correct"><i data-lucide="check" style="width:11px;height:11px;"></i> Benar</span>'
+          : '<span class="corr-badge corr-badge-wrong"><i data-lucide="x" style="width:11px;height:11px;"></i> Salah</span>');
 
-      const statusBadge = (q.type !== 'ES')
-        ? (isCorrect ? '<span class="badge badge-success">Benar</span>' : '<span class="badge badge-danger">Salah</span>')
-        : '<span class="badge badge-info">Esai</span>';
-
-      qListContainer.innerHTML += `
-        <div class="question-correction-card" style="${isCorrectStyle}">
-          <div class="correction-header-row">
-            <span style="font-weight:700;">Soal ${qNum} (${q.type})</span>
-            ${statusBadge}
-          </div>
-          
-          <p style="font-size:0.9rem; margin-bottom:0.75rem; font-weight:500;">${q.text}</p>
-          
-          <div class="grading-compare">
-            <div class="compare-block">
-              <span class="compare-label">Kunci Jawaban</span>
-              <span class="compare-value" style="color:var(--primary);">${Array.isArray(correctKey) ? correctKey.join(', ') : correctKey}</span>
-            </div>
-            <div class="compare-block">
-              <span class="compare-label">Respon Siswa</span>
-              <span class="compare-value">${Array.isArray(studAns) ? studAns.join(', ') : (studAns || '<em style="color:var(--danger);">Kosong</em>')}</span>
-            </div>
-          </div>
-          
-          ${matchInfo}
-          
-          <div class="flex-between mt-3">
-            <span class="stat-label">Bobot Nilai: ${q.weight}</span>
-            <div class="correction-score-input-wrapper">
-              <label style="font-size:0.8rem; font-weight:700;">Nilai Korektor:</label>
-              <input type="number" class="form-input q-correction-score" 
-                     data-qid="${q.id}" 
-                     data-max="${q.weight}" 
-                     value="${finalScore}" 
-                     min="0" max="${q.weight}" 
-                     step="0.5"
-                     oninput="app.recalculateCorrectionTotal()" 
-                     style="width:70px; padding:0.3rem 0.5rem; text-align:center;">
-              <span class="score-badge-max">/ ${q.weight}</span>
-            </div>
-          </div>
-        </div>
-      `;
-
-      // 2. Render Right panel input editor (Allows correcting student input errors)
-      let editorHtml = '';
+      // Answer editor input HTML
+      let editorInputHtml = '';
       if (q.type === 'PG') {
-        editorHtml = `
-          <select class="form-input editor-input" data-qid="${q.id}" data-type="PG" onchange="app.handleAnswerEditChange('${q.id}')">
-            <option value="" ${!studAns ? 'selected' : ''}>-- Kosong --</option>
-            ${['A', 'B', 'C', 'D', 'E'].map(opt => `<option value="${opt}" ${studAns === opt ? 'selected' : ''}>Pilihan ${opt}</option>`).join('')}
-          </select>
-        `;
+        editorInputHtml = `<select class="form-input editor-input corr-answer-input" data-qid="${q.id}" data-type="PG" onchange="app.handleAnswerEditChange('${q.id}')">
+          <option value="" ${!studAns ? 'selected' : ''}>— Kosong —</option>
+          ${['A','B','C','D','E'].map(opt => `<option value="${opt}" ${studAns===opt?'selected':''}>Pilihan ${opt}</option>`).join('')}
+        </select>`;
       } else if (q.type === 'PGK') {
         const sKeys = Array.isArray(studAns) ? studAns : [];
-        editorHtml = `
-          <div style="display:flex; gap:0.25rem;" class="editor-input-pgk-container" data-qid="${q.id}" data-type="PGK">
-            ${['A', 'B', 'C', 'D', 'E'].map(opt => {
-              const checked = sKeys.includes(opt) ? 'checked' : '';
-              return `
-                <label style="font-size:0.8rem; display:flex; align-items:center; gap:0.2rem; cursor:pointer; background:var(--bg-base); padding:0.25rem 0.5rem; border-radius:4px; border:1px solid var(--border-color);">
-                  <input type="checkbox" value="${opt}" ${checked} onchange="app.handleAnswerEditChange('${q.id}')"> ${opt}
-                </label>
-              `;
-            }).join('')}
-          </div>
-        `;
+        editorInputHtml = `<div class="editor-input-pgk-container corr-answer-input" data-qid="${q.id}" data-type="PGK" style="display:flex;gap:0.3rem;flex-wrap:wrap;">
+          ${['A','B','C','D','E'].map(opt => {
+            const chk = sKeys.includes(opt) ? 'checked' : '';
+            return `<label class="pgk-check-label"><input type="checkbox" value="${opt}" ${chk} onchange="app.handleAnswerEditChange('${q.id}')"> ${opt}</label>`;
+          }).join('')}
+        </div>`;
       } else if (q.type === 'BS') {
-        editorHtml = `
-          <select class="form-input editor-input" data-qid="${q.id}" data-type="BS" onchange="app.handleAnswerEditChange('${q.id}')">
-            <option value="" ${!studAns ? 'selected' : ''}>-- Kosong --</option>
-            <option value="Benar" ${studAns === 'Benar' ? 'selected' : ''}>BENAR</option>
-            <option value="Salah" ${studAns === 'Salah' ? 'selected' : ''}>SALAH</option>
-          </select>
-        `;
+        editorInputHtml = `<select class="form-input editor-input corr-answer-input" data-qid="${q.id}" data-type="BS" onchange="app.handleAnswerEditChange('${q.id}')">
+          <option value="" ${!studAns?'selected':''}>— Kosong —</option>
+          <option value="Benar" ${studAns==='Benar'?'selected':''}>BENAR</option>
+          <option value="Salah" ${studAns==='Salah'?'selected':''}>SALAH</option>
+        </select>`;
       } else if (q.type === 'ES') {
-        editorHtml = `
-          <textarea class="form-input editor-input" data-qid="${q.id}" data-type="ES" rows="2" style="font-size:0.85rem;" oninput="app.handleAnswerEditChange('${q.id}')">${studAns || ''}</textarea>
-        `;
+        editorInputHtml = `<textarea class="form-input editor-input corr-answer-input" data-qid="${q.id}" data-type="ES" rows="2" oninput="app.handleAnswerEditChange('${q.id}')">${studAns||''}</textarea>`;
       }
 
-      editorsContainer.innerHTML += `
-        <div style="display:flex; flex-direction:column; gap:0.25rem;">
-          <span style="font-size:0.75rem; font-weight:700;">Soal ${qNum} (${q.type}):</span>
-          ${editorHtml}
-        </div>
-      `;
+      const correctKeyDisplay = Array.isArray(correctKey) ? correctKey.join(', ') : (correctKey || '—');
+
+      // Build unified card
+      const cardHtml = `
+        <div class="corr-unified-card corr-state-${validState} question-correction-card" data-qid="${q.id}" style="">
+          <!-- TOP: number + type + validation badge -->
+          <div class="corr-card-header">
+            <span class="corr-q-number">No. ${qNum}</span>
+            <span class="corr-q-type">${q.type}</span>
+            <div id="badge-${q.id}" class="corr-badge-wrap">${badgeHtml}</div>
+            <span class="corr-q-weight">Bobot: ${q.weight}</span>
+          </div>
+          ${q.text ? `<p class="corr-q-text">${q.text}</p>` : ''}
+          <!-- KEY + STUDENT ANSWER side by side -->
+          <div class="corr-answer-row">
+            <div class="corr-answer-col corr-key-col">
+              <span class="corr-col-label">Kunci Jawaban</span>
+              <span class="corr-key-value compare-value" id="key-display-${q.id}">${correctKeyDisplay}</span>
+            </div>
+            <div class="corr-answer-col corr-student-col">
+              <span class="corr-col-label">Jawaban Siswa</span>
+              <div class="corr-editor-wrap">
+                ${editorInputHtml}
+              </div>
+            </div>
+          </div>
+          ${matchInfoHtml ? `<div class="corr-match-row">${matchInfoHtml}</div>` : ''}
+          <!-- SCORE input row -->
+          <div class="corr-score-row">
+            <span class="corr-score-label">Nilai Korektor:</span>
+            <input type="number" class="form-input q-correction-score" 
+                   data-qid="${q.id}" data-max="${q.weight}"
+                   value="${finalScore}" min="0" max="${q.weight}" step="0.5"
+                   oninput="app.recalculateCorrectionTotal()"
+                   style="width:64px;padding:0.25rem 0.4rem;text-align:center;font-size:0.85rem;">
+            <span class="corr-score-max">/ ${q.weight}</span>
+          </div>
+        </div>`;
+
+      if (unifiedContainer) unifiedContainer.innerHTML += cardHtml;
+
+      // Also populate legacy containers for JS compatibility (handleAnswerEditChange reads them)
+      qListContainer.innerHTML += `<div class="question-correction-card" data-qid="${q.id}" style="display:none;"></div>`;
+      editorsContainer.innerHTML += `<div style="display:none;">${editorInputHtml.replace('corr-answer-input','editor-input')}</div>`;
     });
 
     this.recalculateCorrectionTotal();
@@ -1715,7 +1677,7 @@ class KoreksiSoalApp {
 
   // Recalculates total score dynamically as the corrector changes individual grades
   recalculateCorrectionTotal() {
-    const inputs = document.querySelectorAll('.q-correction-score');
+    const inputs = document.querySelectorAll('#correction-unified-list .q-correction-score');
     let total = 0;
     let correctCount = 0;
     let wrongCount = 0;
@@ -1752,11 +1714,11 @@ class KoreksiSoalApp {
     const exam = this.exams.find(e => e.id === sub.examId);
     const question = exam.questions.find(q => q.id === qid);
 
-    // Grab the specific input element
+    // Grab the specific input element (check unified container first)
     let newVal = '';
-    const pgInput = document.querySelector(`.editor-input[data-qid="${qid}"][data-type="PG"]`);
-    const bsInput = document.querySelector(`.editor-input[data-qid="${qid}"][data-type="BS"]`);
-    const esInput = document.querySelector(`.editor-input[data-qid="${qid}"][data-type="ES"]`);
+    const pgInput = document.querySelector(`.corr-answer-input[data-qid="${qid}"][data-type="PG"]`) || document.querySelector(`.editor-input[data-qid="${qid}"][data-type="PG"]`);
+    const bsInput = document.querySelector(`.corr-answer-input[data-qid="${qid}"][data-type="BS"]`) || document.querySelector(`.editor-input[data-qid="${qid}"][data-type="BS"]`);
+    const esInput = document.querySelector(`.corr-answer-input[data-qid="${qid}"][data-type="ES"]`) || document.querySelector(`.editor-input[data-qid="${qid}"][data-type="ES"]`);
     const pgkContainer = document.querySelector(`.editor-input-pgk-container[data-qid="${qid}"]`);
 
     if (pgInput) {
@@ -1826,37 +1788,40 @@ class KoreksiSoalApp {
       }
     }
 
-    // Update badge status (Benar/Salah/Esai) di correction-header-row
-    const headerRow = card.querySelector('.correction-header-row');
-    const badgeContainer = headerRow ? headerRow.querySelector('.badge') : card.querySelector('.badge');
+    // Update unified card (new design)
+    const unifiedCard = document.querySelector(`#correction-unified-list .corr-unified-card[data-qid="${qid}"]`);
+    if (unifiedCard) {
+      // Update badge
+      const badgeWrap = unifiedCard.querySelector(`#badge-${qid}`);
+      if (badgeWrap) {
+        if (question.type === 'ES') {
+          badgeWrap.innerHTML = '<span class="corr-badge corr-badge-esai">Esai</span>';
+        } else if (isCorrect) {
+          badgeWrap.innerHTML = '<span class="corr-badge corr-badge-correct"><i data-lucide="check" style="width:11px;height:11px;"></i> Benar</span>';
+        } else {
+          badgeWrap.innerHTML = '<span class="corr-badge corr-badge-wrong"><i data-lucide="x" style="width:11px;height:11px;"></i> Salah</span>';
+        }
+      }
+      // Update state class
+      unifiedCard.classList.remove('corr-state-correct','corr-state-wrong','corr-state-esai');
+      unifiedCard.classList.add('corr-state-' + (question.type==='ES' ? 'esai' : (isCorrect ? 'correct' : 'wrong')));
+      // Update match info
+      const matchRow = unifiedCard.querySelector('.corr-match-row');
+      if (matchRow) matchRow.innerHTML = matchInfoHtml || '';
+      // Set score
+      const scoreInput2 = unifiedCard.querySelector('.q-correction-score');
+      if (scoreInput2) scoreInput2.value = calculatedScore;
+    }
+
+    // Legacy card update (hidden fallback)
+    const badgeContainer = card ? card.querySelector('.badge') : null;
     if (badgeContainer) {
       badgeContainer.className = 'badge ' + (question.type === 'ES' ? 'badge-info' : (isCorrect ? 'badge-success' : 'badge-danger'));
       badgeContainer.innerText = question.type === 'ES' ? 'Esai' : (isCorrect ? 'Benar' : 'Salah');
     }
-
-    // Update tampilan "Respon Siswa" (compare-block kedua) — cari dengan index yang benar
-    const compareBlocks = card.querySelectorAll('.compare-block');
-    if (compareBlocks.length >= 2) {
-      const studAnsEl = compareBlocks[1].querySelector('.compare-value');
-      if (studAnsEl) {
-        studAnsEl.innerText = Array.isArray(newVal) ? newVal.join(', ') : (newVal || 'Kosong');
-      }
-    }
-    
-    // Update key matching display if exists
-    const matchHint = card.querySelector('.keyword-match-hint');
-    if (matchHint) {
-      matchHint.outerHTML = matchInfoHtml || '<div class="keyword-match-hint"></div>';
-    } else if (matchInfoHtml) {
-      // Inject after compare block
-      card.querySelector('.grading-compare').insertAdjacentHTML('afterend', matchInfoHtml);
-    }
-
-    // Set score input
-    const scoreInput = card.querySelector('.q-correction-score');
-    scoreInput.value = calculatedScore;
-
-    card.style.borderColor = (question.type !== 'ES') ? (isCorrect ? 'var(--success)' : 'var(--danger)') : 'var(--border-color)';
+    const scoreInput = card ? card.querySelector('.q-correction-score') : null;
+    if (scoreInput) scoreInput.value = calculatedScore;
+    if (card) card.style.borderColor = (question.type !== 'ES') ? (isCorrect ? 'var(--success)' : 'var(--danger)') : 'var(--border-color)';
     
     this.recalculateCorrectionTotal();
     lucide.createIcons();

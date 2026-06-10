@@ -50,6 +50,11 @@ class KoreksiSoalApp {
     const hasSession = DB.restoreSession();
 
     if (hasSession || DB.mode === 'offline') {
+      // Pre-load profil dari localStorage agar UI tidak kosong saat loadAllData berjalan
+      const cachedProfile = localStorage.getItem('ks_profile');
+      if (cachedProfile) {
+        try { this.profile = JSON.parse(cachedProfile); } catch(e) {}
+      }
       await this.loadAllData();
     } else {
       // Tampilkan layar login jika online tapi belum login
@@ -261,13 +266,18 @@ class KoreksiSoalApp {
         await this.loadAllData();
         this.syncSubmissions();
         this.switchView('dashboard');
+        // Tampilkan notifikasi jika login dari cache lokal
+        if (result.fromCache) {
+          this.showToast('Login dari data tersimpan — beberapa fitur mungkin terbatas sampai jaringan pulih.', 'warning');
+        }
       } else {
-        errEl.textContent = result.error || 'Login gagal.';
+        errEl.textContent = result.error || 'Login gagal. Periksa NIP dan password Anda.';
         errEl.style.display = 'block';
       }
     } catch (err) {
-      errEl.textContent = err.message;
+      errEl.textContent = 'Gagal terhubung ke server. Periksa koneksi internet Anda.';
       errEl.style.display = 'block';
+      console.error('[handleLogin]', err);
     } finally {
       btn.disabled = false;
       btn.innerHTML = '<i data-lucide="log-in"></i> Masuk';
@@ -376,10 +386,13 @@ class KoreksiSoalApp {
       const brandName = document.querySelector('.brand-name');
       if (brandName) brandName.appendChild(badge);
     }
+    const hasToken = !!localStorage.getItem('ks_session_token');
     if (DB.mode === 'online') {
-      badge.textContent = '🟢 Online';
+      badge.textContent = hasToken ? '🟢 Online (Multi-device)' : '🟢 Online';
       badge.style.background = '#dcfce7'; badge.style.color = '#166534';
-      badge.title = 'Terhubung ke Google Spreadsheet';
+      badge.title = hasToken
+        ? 'Terhubung ke Google Spreadsheet — Sesi aktif di beberapa perangkat'
+        : 'Terhubung ke Google Spreadsheet';
     } else {
       badge.textContent = '🟡 Offline';
       badge.style.background = '#fef9c3'; badge.style.color = '#854d0e';

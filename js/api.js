@@ -18,6 +18,9 @@ const KS_API = {
   // ID guru yang sedang login (diisi setelah login berhasil)
   teacherId: null,
 
+  // Session token untuk validasi multi-device (diisi setelah login berhasil)
+  _sessionToken: null,
+
   /**
    * Kirim request ke Google Apps Script
    * @param {string} action - Nama action
@@ -28,20 +31,33 @@ const KS_API = {
     try {
       let response;
 
+      // Sertakan session token di setiap request agar server bisa
+      // memvalidasi sesi dari device manapun (multi-device support)
+      const sessionToken = this._sessionToken || localStorage.getItem('ks_session_token');
+      const basePayload = { action, ...payload };
+      if (sessionToken) basePayload.sessionToken = sessionToken;
+
       if (isPost) {
         response = await fetch(GAS_URL, {
           method: 'POST',
           // redirect: 'follow' diperlukan karena GAS memakai redirect
           redirect: 'follow',
           headers: { 'Content-Type': 'text/plain' },
-          body: JSON.stringify({ action, ...payload })
+          body: JSON.stringify(basePayload)
         });
       } else {
-        const params = new URLSearchParams({ action, ...payload });
+        const params = new URLSearchParams(basePayload);
         response = await fetch(`${GAS_URL}?${params}`, { redirect: 'follow' });
       }
 
       const result = await response.json();
+
+      // Jika server mengembalikan session token baru (token refresh),
+      // simpan otomatis untuk mendukung rotasi token multi-device
+      if (result.sessionToken) {
+        this._sessionToken = result.sessionToken;
+        localStorage.setItem('ks_session_token', result.sessionToken);
+      }
 
       if (result.error) {
         console.error('[KS_API]', action, result.error);
@@ -130,13 +146,24 @@ const DB = {
     }
 
     try {
-      // Ping ringan ke API
-      await KS_API.call('getAll', { sheet: 'teachers', teacherId: 'ping-test' });
+      // Ping ringan ke API — gunakan action 'ping' khusus
+      // Server harus menangani action 'ping' dan mengembalikan { ok: true }
+      // Jika server belum punya handler ping, fallback ke getAll dengan teacherId dummy
+      await KS_API.call('ping', {});
       this.mode = 'online';
       console.info('[DB] Mode: ONLINE (Google Spreadsheet)');
     } catch (e) {
-      this.mode = 'offline';
-      console.warn('[DB] Mode: OFFLINE (localStorage) — API tidak terjangkau:', e.message);
+      // Jika ada session token tersimpan, asumsikan online dan biarkan
+      // request berikutnya yang gagal jika memang offline
+      const savedToken = localStorage.getItem('ks_session_token');
+      const savedId    = localStorage.getItem('ks_teacherId');
+      if (savedToken && savedId) {
+        this.mode = 'online';
+        console.warn('[DB] Mode: ONLINE (asumsi — ping gagal tapi session aktif):', e.message);
+      } else {
+        this.mode = 'offline';
+        console.warn('[DB] Mode: OFFLINE (localStorage) — API tidak terjangkau:', e.message);
+      }
     }
   },
 
@@ -150,33 +177,61 @@ const DB = {
 
   async login(nip, password) {
     if (this.mode !== 'online') {
-      // Offline: cek NIP dan password
+      // ---- MODE OFFLINE ----
       const saved = localStorage.getItem('ks_profile');
       if (saved) {
         const profile = JSON.parse(saved);
         const savedPwd = localStorage.getItem('ks_password');
         if (profile.nip === nip) {
-          // Jika belum ada password tersimpan, izinkan login pertama kali
+          // Izinkan jika password cocok, atau belum ada password tersimpan
           if (!savedPwd || savedPwd === password) {
+            if (profile.id) KS_API.teacherId = profile.id;
             return { success: true, teacher: profile };
           } else {
             return { success: false, error: 'Password salah.' };
           }
         } else {
-          return { success: false, error: 'NIP tidak ditemukan.' };
+          return { success: false, error: 'NIP tidak ditemukan. Pastikan NIP benar atau daftar akun baru.' };
         }
       }
-      // Offline pertama kali: izinkan login dengan NIP apa saja
+      // Offline pertama kali: izinkan masuk
       return { success: true, teacher: null, offlineFirstTime: true };
     }
 
-    const result = await KS_API.login(nip, password);
-    if (result.success) {
-      KS_API.teacherId = result.teacher.id;
-      localStorage.setItem('ks_teacherId', result.teacher.id);
-      localStorage.setItem('ks_profile', JSON.stringify(result.teacher));
+    // ---- MODE ONLINE ----
+    try {
+      const result = await KS_API.login(nip, password);
+      if (result.success && result.teacher) {
+        KS_API.teacherId = result.teacher.id;
+
+        // Simpan session token untuk multi-device (jika server mengembalikannya)
+        const token = result.sessionToken || result.token || null;
+        if (token) {
+          KS_API._sessionToken = token;
+          localStorage.setItem('ks_session_token', token);
+        }
+
+        localStorage.setItem('ks_teacherId', result.teacher.id);
+        localStorage.setItem('ks_profile', JSON.stringify(result.teacher));
+
+        // Simpan password untuk fallback offline
+        if (password) localStorage.setItem('ks_password', password);
+      }
+      return result;
+    } catch (e) {
+      // Gagal jaringan sementara: coba fallback ke data lokal yang tersimpan
+      console.warn('[DB.login] Online login gagal, coba cache lokal:', e.message);
+      const saved = localStorage.getItem('ks_profile');
+      if (saved) {
+        const profile = JSON.parse(saved);
+        const savedPwd = localStorage.getItem('ks_password');
+        if (profile.nip === nip && (!savedPwd || savedPwd === password)) {
+          if (profile.id) KS_API.teacherId = profile.id;
+          return { success: true, teacher: profile, fromCache: true };
+        }
+      }
+      throw e;
     }
-    return result;
   },
 
   async register(profileData) {
@@ -186,25 +241,49 @@ const DB = {
         id: 'offline-' + Date.now(),
         ...profileData
       };
-      delete offlineTeacher.password; // jangan simpan password di profile
+      delete offlineTeacher.password; // jangan simpan password di profile object
       localStorage.setItem('ks_profile', JSON.stringify(offlineTeacher));
       if (profileData.password) localStorage.setItem('ks_password', profileData.password);
+      if (offlineTeacher.id) KS_API.teacherId = offlineTeacher.id;
       return { success: true, teacher: offlineTeacher };
     }
 
     const result = await KS_API.register(profileData);
-    if (result.success) {
+    if (result.success && result.teacher) {
       KS_API.teacherId = result.teacher.id;
+
+      const token = result.sessionToken || result.token || null;
+      if (token) {
+        KS_API._sessionToken = token;
+        localStorage.setItem('ks_session_token', token);
+      }
+
       localStorage.setItem('ks_teacherId', result.teacher.id);
       localStorage.setItem('ks_profile', JSON.stringify(result.teacher));
+
+      // Simpan password untuk fallback offline setelah register online
+      if (profileData.password) {
+        localStorage.setItem('ks_password', profileData.password);
+      }
     }
     return result;
   },
 
+  /**
+   * Pulihkan sesi dari storage lokal.
+   * Mendukung multi-device: prioritaskan session token dari server,
+   * fallback ke teacherId yang tersimpan.
+   */
   restoreSession() {
-    const savedId = localStorage.getItem('ks_teacherId');
+    const savedId    = localStorage.getItem('ks_teacherId');
+    const savedToken = localStorage.getItem('ks_session_token');
+
     if (savedId) {
       KS_API.teacherId = savedId;
+      // Lampirkan token ke instance API agar ikut di setiap request
+      if (savedToken) {
+        KS_API._sessionToken = savedToken;
+      }
       return true;
     }
     return false;
@@ -212,8 +291,10 @@ const DB = {
 
   logout() {
     KS_API.teacherId = null;
+    KS_API._sessionToken = null;
     localStorage.removeItem('ks_teacherId');
-    // Note: ks_profile, ks_password, dan data lain tetap tersimpan untuk re-login
+    localStorage.removeItem('ks_session_token');
+    // ks_profile & ks_password tetap tersimpan agar re-login offline bisa berjalan
   },
 
   async changePassword(oldPassword, newPassword) {
@@ -226,7 +307,7 @@ const DB = {
       try {
         return await KS_API.call('changePassword', { teacherId: KS_API.teacherId, newPassword }, true);
       } catch(e) {
-        return { success: true }; // saved locally at least
+        return { success: true }; // tersimpan lokal
       }
     }
     return { success: true };

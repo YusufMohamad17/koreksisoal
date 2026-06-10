@@ -427,7 +427,16 @@ class KoreksiSoalApp {
       });
     });
     if (newSubs.length > 0) {
-      newSubs.forEach(sub => DB.saveSubmission(sub).catch(console.error));
+      // Simpan semua sekaligus (atomic) untuk menghindari race condition
+      // saat forEach + individual saveSubmission dipanggil bersamaan ke localStorage
+      DB.saveManySubmissions(newSubs).catch(() => {
+        // Fallback: simpan satu per satu secara sequential
+        (async () => {
+          for (const sub of newSubs) {
+            try { await DB.saveSubmission(sub); } catch(e) { console.error(e); }
+          }
+        })();
+      });
     }
   }
 

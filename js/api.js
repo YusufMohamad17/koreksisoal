@@ -365,6 +365,12 @@ const DB = {
       localStorage.setItem('ks_students', JSON.stringify(students));
       return { success: true };
     }
+    // Update localStorage cache agar data siswa tersedia saat offline/reload
+    const students = JSON.parse(localStorage.getItem('ks_students') || '[]');
+    const idx = students.findIndex(s => s.id === student.id);
+    if (idx >= 0) students[idx] = student;
+    else students.push(student);
+    localStorage.setItem('ks_students', JSON.stringify(students));
     return KS_API.save(KS_API.SHEETS.STUDENTS, student);
   },
 
@@ -374,6 +380,9 @@ const DB = {
       localStorage.setItem('ks_students', JSON.stringify(students.filter(s => s.id !== id)));
       return { success: true };
     }
+    // Update localStorage cache agar penghapusan langsung terrefleksi
+    const students = JSON.parse(localStorage.getItem('ks_students') || '[]');
+    localStorage.setItem('ks_students', JSON.stringify(students.filter(s => s.id !== id)));
     return KS_API.delete(KS_API.SHEETS.STUDENTS, id);
   },
 
@@ -440,9 +449,26 @@ const DB = {
 
   async saveManySubmissions(submissions) {
     if (!this.isOnline()) {
-      localStorage.setItem('ks_submissions', JSON.stringify(submissions));
+      // Merge dengan submissions yang sudah ada, jangan overwrite semuanya
+      const existing = JSON.parse(localStorage.getItem('ks_submissions') || '[]');
+      const merged = [...existing];
+      submissions.forEach(sub => {
+        const idx = merged.findIndex(s => s.id === sub.id);
+        if (idx >= 0) merged[idx] = sub;
+        else merged.push(sub);
+      });
+      localStorage.setItem('ks_submissions', JSON.stringify(merged));
       return { success: true };
     }
+    // Mode online: update localStorage cache juga
+    const existing = JSON.parse(localStorage.getItem('ks_submissions') || '[]');
+    const merged = [...existing];
+    submissions.forEach(sub => {
+      const idx = merged.findIndex(s => s.id === sub.id);
+      if (idx >= 0) merged[idx] = sub;
+      else merged.push(sub);
+    });
+    localStorage.setItem('ks_submissions', JSON.stringify(merged));
     return KS_API.saveMany(KS_API.SHEETS.SUBMISSIONS, submissions);
   },
 

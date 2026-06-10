@@ -381,7 +381,7 @@ class KoreksiSoalApp {
     if (!badge) {
       badge = document.createElement('span');
       badge.id = 'db-mode-badge';
-      badge.style.cssText = 'display:inline-block; width:10px; height:10px; border-radius:50%; margin-left:8px; vertical-align:middle; flex-shrink:0; cursor:default; border:2px solid rgba(0,0,0,0.1);';
+      badge.style.cssText = 'display:inline-block; width:8px; height:8px; border-radius:50%; margin-left:8px; vertical-align:middle; flex-shrink:0; cursor:default;';
       const brandName = document.querySelector('.brand-name');
       if (brandName) brandName.appendChild(badge);
     }
@@ -990,13 +990,15 @@ class KoreksiSoalApp {
   }
 
   generateBSOptionsHtml(index, selectedKey = '') {
-    const isBenar = selectedKey === 'Benar' ? 'selected' : '';
-    const isSalah = selectedKey === 'Salah' ? 'selected' : '';
+    // Normalize for legacy data that may have been stored as 'BENAR'/'SALAH'
+    const normKey = (selectedKey || '').toLowerCase();
+    const isBenar = normKey === 'benar' ? 'selected' : '';
+    const isSalah = normKey === 'salah' ? 'selected' : '';
     
     return `
       <div class="q-options-container" data-qindex="${index}" data-mode="bs">
-        <div class="bs-toggle-btn ${isBenar}" onclick="app.selectBSOption(this, 'Benar')">BENAR</div>
-        <div class="bs-toggle-btn ${isSalah}" onclick="app.selectBSOption(this, 'Salah')">SALAH</div>
+        <div class="bs-toggle-btn ${isBenar}" data-val="Benar" onclick="app.selectBSOption(this, 'Benar')">BENAR</div>
+        <div class="bs-toggle-btn ${isSalah}" data-val="Salah" onclick="app.selectBSOption(this, 'Salah')">SALAH</div>
       </div>
     `;
   }
@@ -1079,7 +1081,9 @@ class KoreksiSoalApp {
   // Bulk Generator button trigger
   bulkGenerateQuestions() {
     const countInput = document.getElementById('bulk-question-count');
+    const typeSelect = document.getElementById('bulk-question-type');
     const num = parseInt(countInput.value);
+    const bulkType = typeSelect ? typeSelect.value : 'PG';
     
     if (isNaN(num) || num <= 0) {
       alert('Masukkan jumlah butir soal yang valid!');
@@ -1092,6 +1096,10 @@ class KoreksiSoalApp {
     const defaultWeight = Math.round(100 / num);
     let cumulative = 0;
 
+    // Determine sensible default key per type
+    const defaultKeyMap = { 'PG': 'A', 'PGK': ['A'], 'BS': 'Benar', 'ES': '' };
+    const defaultKey = defaultKeyMap[bulkType] !== undefined ? defaultKeyMap[bulkType] : 'A';
+
     for (let i = 1; i <= num; i++) {
       let weight = defaultWeight;
       cumulative += defaultWeight;
@@ -1102,10 +1110,10 @@ class KoreksiSoalApp {
       }
 
       this.addQuestionRowToModal(i, {
-        type: 'PG',
+        type: bulkType,
         text: '',
         weight: weight,
-        key: 'A'
+        key: defaultKey
       });
     }
     this.calculateFormWeights();
@@ -1154,7 +1162,7 @@ class KoreksiSoalApp {
         }
       } else if (type === 'BS') {
         const selectedBtn = card.querySelector('.bs-toggle-btn.selected');
-        key = selectedBtn ? selectedBtn.innerText : '';
+        key = selectedBtn ? (selectedBtn.getAttribute('data-val') || selectedBtn.innerText.trim()) : '';
       } else if (type === 'ES') {
         const keyInput = card.querySelector('.q-key-input');
         key = keyInput ? keyInput.value.trim() : '';
@@ -1566,7 +1574,10 @@ class KoreksiSoalApp {
         }
         matchInfo = `Cocok: ${sKeys.filter(k => cKeys.includes(k)).join(', ')}`;
       } else if (q.type === 'BS') {
-        isCorrect = studAns === correctKey;
+        // Normalize both to lowercase for comparison (handles legacy 'BENAR'/'SALAH' keys)
+        const normStudAns = (studAns || '').toLowerCase();
+        const normCorrectKey = (correctKey || '').toLowerCase();
+        isCorrect = normStudAns !== '' && normStudAns === normCorrectKey;
         calculatedScore = isCorrect ? q.weight : 0;
       } else if (q.type === 'ES') {
         // Essay key matches
@@ -1795,7 +1806,10 @@ class KoreksiSoalApp {
       }
       matchInfoHtml = `Cocok: ${sKeys.filter(k => cKeys.includes(k)).join(', ')}`;
     } else if (question.type === 'BS') {
-      isCorrect = newVal === correctKey;
+      // Normalize both to lowercase for comparison (handles legacy 'BENAR'/'SALAH' keys)
+      const normNew = (newVal || '').toLowerCase();
+      const normKey = (correctKey || '').toLowerCase();
+      isCorrect = normNew !== '' && normNew === normKey;
       calculatedScore = isCorrect ? question.weight : 0;
     } else if (question.type === 'ES') {
       const tags = correctKey.split(',').map(t => t.trim().toLowerCase()).filter(t => t);
@@ -2137,7 +2151,8 @@ Catatan: Laporan ini dibuat otomatis secara resmi oleh sistem *KoreksiSoal*. Ter
         phone: this.profile.reportHeaderPhone || '',
         email: this.profile.reportHeaderEmail || '',
         website: this.profile.reportHeaderWebsite || '',
-        logo: this.profile.reportLogoBase64 || ''
+        logo: this.profile.reportLogoBase64 || '',
+        logoRight: this.profile.reportLogoBase64Right || null
       });
     }
     // Update city in signature section
@@ -2532,10 +2547,14 @@ Catatan: Laporan ini dibuat otomatis secara resmi oleh sistem *KoreksiSoal*. Ter
     const btnPreviewKop = document.getElementById('btn-preview-kop');
     if (btnPreviewKop) btnPreviewKop.addEventListener('click', () => this.updateKopPreview());
 
-    // Kop logo upload
+    // Kop logo upload (left and right)
     const kopLogoUpload = document.getElementById('kop-logo-upload');
     if (kopLogoUpload) {
-      kopLogoUpload.addEventListener('change', (e) => this.uploadKopLogo(e));
+      kopLogoUpload.addEventListener('change', (e) => this.uploadKopLogo(e, 'left'));
+    }
+    const kopLogoUpload2 = document.getElementById('kop-logo-upload2');
+    if (kopLogoUpload2) {
+      kopLogoUpload2.addEventListener('change', (e) => this.uploadKopLogo(e, 'right'));
     }
   }
 
@@ -2543,7 +2562,7 @@ Catatan: Laporan ini dibuat otomatis secara resmi oleh sistem *KoreksiSoal*. Ter
   // KOP RAPORT METHODS
   // ============================================================
 
-  uploadKopLogo(event) {
+  uploadKopLogo(event, side = 'left') {
     const file = event.target.files[0];
     if (!file) return;
     if (file.size > 1024 * 512) { // 512KB limit for logo
@@ -2552,8 +2571,13 @@ Catatan: Laporan ini dibuat otomatis secara resmi oleh sistem *KoreksiSoal*. Ter
     }
     const reader = new FileReader();
     reader.onload = (e) => {
-      this.profile.reportLogoBase64 = e.target.result;
-      this.showToast('Logo berhasil diunggah!', 'success');
+      if (side === 'right') {
+        this.profile.reportLogoBase64Right = e.target.result;
+        this.showToast('Logo kanan berhasil diunggah!', 'success');
+      } else {
+        this.profile.reportLogoBase64 = e.target.result;
+        this.showToast('Logo kiri berhasil diunggah!', 'success');
+      }
       this.updateKopPreview();
     };
     reader.readAsDataURL(file);
@@ -2589,14 +2613,19 @@ Catatan: Laporan ini dibuat otomatis secara resmi oleh sistem *KoreksiSoal*. Ter
     const website = document.getElementById('kop-website') ? document.getElementById('kop-website').value : (this.profile.reportHeaderWebsite || '');
     const logo = this.profile.reportLogoBase64;
 
-    container.innerHTML = this.buildKopHtml({ title, schoolName, address, city, phone, email, website, logo });
+    const logoRight = this.profile.reportLogoBase64Right || null;
+    container.innerHTML = this.buildKopHtml({ title, schoolName, address, city, phone, email, website, logo, logoRight });
   }
 
-  buildKopHtml({ title, schoolName, address, city, phone, email, website, logo }) {
-    // Logo kiri dan kanan identik agar teks kop tepat di tengah
+  buildKopHtml({ title, schoolName, address, city, phone, email, website, logo, logoRight }) {
+    // Logo kiri dan kanan bisa berbeda
     const logoHtml = logo
-      ? `<img src="${logo}" style="width:70px;height:70px;object-fit:contain;flex-shrink:0;" alt="Logo Sekolah">`
-      : `<div style="width:70px;height:70px;border:2px dashed #aaa;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:0.6rem;color:#999;text-align:center;">Logo<br>Sekolah</div>`;
+      ? `<img src="${logo}" style="width:70px;height:70px;object-fit:contain;flex-shrink:0;" alt="Logo Kiri">`
+      : `<div style="width:70px;height:70px;border:2px dashed #aaa;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:0.6rem;color:#999;text-align:center;">Logo<br>Kiri</div>`;
+    const effectiveLogoRight = logoRight || logo;
+    const logoRightHtml = effectiveLogoRight
+      ? `<img src="${effectiveLogoRight}" style="width:70px;height:70px;object-fit:contain;flex-shrink:0;" alt="Logo Kanan">`
+      : `<div style="width:70px;height:70px;border:2px dashed #aaa;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:0.6rem;color:#999;text-align:center;">Logo<br>Kanan</div>`;
 
     const contact = [
       phone ? `📞 ${phone}` : '',
@@ -2613,7 +2642,7 @@ Catatan: Laporan ini dibuat otomatis secara resmi oleh sistem *KoreksiSoal*. Ter
           ${address ? `<p style="font-size:0.78rem;">${address}${city ? ', ' + city : ''}</p>` : ''}
           ${contact ? `<p style="font-size:0.75rem;color:#555;">${contact}</p>` : ''}
         </div>
-        ${logoHtml}
+        ${logoRightHtml}
       </div>
     `;
   }

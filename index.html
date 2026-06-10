@@ -382,10 +382,17 @@
                 <input type="text" id="kop-website" class="form-input" placeholder="Contoh: www.sman1jakarta.sch.id">
               </div>
               <div class="form-group">
-                <label class="form-label">Logo Sekolah (Opsional)</label>
+                <label class="form-label">Logo Kiri (Opsional)</label>
                 <label class="btn btn-secondary btn-sm" style="display:flex;cursor:pointer;justify-content:center;">
-                  <i data-lucide="image"></i>Upload Logo (PNG/JPG)
+                  <i data-lucide="image"></i>Upload Logo Kiri (PNG/JPG)
                   <input type="file" id="kop-logo-upload" accept="image/*" style="display:none;">
+                </label>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Logo Kanan (Opsional)</label>
+                <label class="btn btn-secondary btn-sm" style="display:flex;cursor:pointer;justify-content:center;">
+                  <i data-lucide="image"></i>Upload Logo Kanan (PNG/JPG)
+                  <input type="file" id="kop-logo-upload2" accept="image/*" style="display:none;">
                 </label>
               </div>
             </div>
@@ -472,6 +479,12 @@
               <h4>Daftar Soal & Kunci Jawaban</h4>
               <div class="bulk-generate-wrapper">
                 <input type="number" id="bulk-question-count" class="form-input" min="1" max="100" placeholder="Jml Soal" style="width:90px;">
+                <select id="bulk-question-type" class="form-input" style="width:auto; font-size:0.85rem;">
+                  <option value="PG">Pilihan Ganda</option>
+                  <option value="PGK">PG Kompleks</option>
+                  <option value="BS">Benar / Salah</option>
+                  <option value="ES">Esai</option>
+                </select>
                 <button type="button" class="btn btn-secondary btn-sm" id="btn-bulk-generate-questions">Buat Sekaligus</button>
               </div>
             </div>

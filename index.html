@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KoreksiSoal - Portal Koreksi & Penilaian Ujian Guru</title>
+
+  <!-- CSS Stylesheet -->
+  <link rel="stylesheet" href="css/style.css">
+
+  <!-- SheetJS for Excel -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+  <!-- html2pdf for PDF -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+  <!-- Chart.js for stats -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+
+<body>
+
+  <!-- TOP HEADER (Desktop & Tablet Navigation) -->
+  <header class="main-header">
+    <div class="brand-section">
+      <div class="brand-logo">
+        <i data-lucide="check-square"></i>
+      </div>
+      <div class="brand-name">KoreksiSoal</div>
+
+      <!-- Quick Teacher Profile (Top Left) -->
+      <div class="teacher-profile-header" id="header-teacher-profile">
+        <div class="teacher-avatar-wrapper">
+          <img src="" alt="Avatar" class="teacher-avatar-img" id="header-avatar">
+        </div>
+        <div class="teacher-info-header">
+          <span class="teacher-name-header" id="header-name">-</span>
+          <span class="teacher-school-header" id="header-school">-</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Navigation Menu Items (Desktop Only) -->
+    <nav class="desktop-nav">
+      <a class="nav-link active" data-target="dashboard">
+        <i data-lucide="layout-dashboard"></i>Dashboard
+      </a>
+      <a class="nav-link" data-target="ujian">
+        <i data-lucide="book-open"></i>Data Ujian
+      </a>
+      <a class="nav-link" data-target="siswa">
+        <i data-lucide="users"></i>Data Siswa
+      </a>
+      <a class="nav-link" data-target="koreksi">
+        <i data-lucide="check-square"></i>Koreksi
+      </a>
+      <a class="nav-link" data-target="eksport">
+        <i data-lucide="download"></i>Eksport
+      </a>
+    </nav>
+
+    <!-- Settings and Theme Controls (Top Right) -->
+    <div class="header-actions">
+      <button class="action-btn" id="toggle-dark-mode" title="Ubah Mode Gelap/Terang">
+        <i data-lucide="moon" id="dark-mode-icon"></i>
+      </button>
+      <button class="action-btn" id="nav-settings-btn" data-target="setting" title="Pengaturan">
+        <i data-lucide="settings"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- BOTTOM NAVBAR (Mobile Navigation) -->
+  <nav class="bottom-nav">
+    <div class="mobile-nav-item active" data-target="dashboard">
+      <i data-lucide="layout-dashboard"></i>
+      <span>Dashboard</span>
+    </div>
+    <div class="mobile-nav-item" data-target="ujian">
+      <i data-lucide="book-open"></i>
+      <span>Ujian</span>
+    </div>
+    <div class="mobile-nav-item" data-target="siswa">
+      <i data-lucide="users"></i>
+      <span>Siswa</span>
+    </div>
+    <div class="mobile-nav-item" data-target="koreksi">
+      <i data-lucide="check-square"></i>
+      <span>Koreksi</span>
+    </div>
+    <div class="mobile-nav-item" data-target="eksport">
+      <i data-lucide="download"></i>
+      <span>Eksport</span>
+    </div>
+  </nav>
+
+  <!-- MAIN CONTAINER FOR VIEWS -->
+  <main class="main-container">
+
+    <!-- 1. DASHBOARD VIEW -->
+    <section id="view-dashboard" class="view-section active">
+      <div class="filter-bar">
+        <h2>Dashboard Guru</h2>
+        <span class="badge badge-info" id="dashboard-academic-year">Tahun Ajar: 2025/2026</span>
+      </div>
+
+      <!-- Quick Statistics Grid -->
+      <div class="grid-container grid-cols-4 mb-4">
+        <div class="card stat-card">
+          <div class="stat-info">
+            <span class="stat-label">Total Ujian</span>
+            <span class="stat-value" id="stat-total-exams">0</span>
+          </div>
+          <div class="stat-icon"><i data-lucide="book-open"></i></div>
+        </div>
+        <div class="card stat-card">
+          <div class="stat-info">
+            <span class="stat-label">Total Siswa</span>
+            <span class="stat-value" id="stat-total-students">0</span>
+          </div>
+          <div class="stat-icon"><i data-lucide="users"></i></div>
+        </div>
+        <div class="card stat-card">
+          <div class="stat-info">
+            <span class="stat-label">Sudah Dikoreksi</span>
+            <span class="stat-value" id="stat-correction-rate">0%</span>
+          </div>
+          <div class="stat-icon"><i data-lucide="check-square"></i></div>
+        </div>
+        <div class="card stat-card">
+          <div class="stat-info">
+            <span class="stat-label">Rata-Rata Nilai</span>
+            <span class="stat-value" id="stat-avg-score">0.0</span>
+          </div>
+          <div class="stat-icon"><i data-lucide="arrow-up"></i></div>
+        </div>
+      </div>
+
+      <!-- Detail Charts & Logs Split -->
+      <div class="grid-container grid-cols-12">
+        <!-- Chart Column -->
+        <div class="card col-span-8">
+          <div class="card-title-container">
+            <h3 class="card-title"><i data-lucide="arrow-up"></i> Distribusi Nilai Rata-rata per Ujian</h3>
+          </div>
+          <div style="position: relative; height: 320px; width: 100%;">
+            <canvas id="dashboardChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Recent Activities Column -->
+        <div class="card col-span-4">
+          <div class="card-title-container">
+            <h3 class="card-title"><i data-lucide="layout-dashboard"></i> Aktivitas Terbaru</h3>
+          </div>
+          <div class="table-container" style="max-height: 320px; overflow-y: auto;">
+            <table class="custom-table" id="activities-table">
+              <tbody>
+                <!-- Populated by JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Overview Lists Split -->
+      <div class="grid-container grid-cols-2 mt-4">
+        <!-- Fast Correction Shortcut -->
+        <div class="card">
+          <div class="card-title-container">
+            <h3 class="card-title"><i data-lucide="check-square"></i> Butuh Koreksi Segera</h3>
+            <button class="btn btn-secondary btn-sm" onclick="app.switchView('koreksi')">Lihat Semua</button>
+          </div>
+          <div class="table-container">
+            <table class="custom-table" id="pending-correction-table">
+              <thead>
+                <tr>
+                  <th>Siswa</th>
+                  <th>Ujian</th>
+                  <th>Status</th>
+                  <th>Aksi</th>
+                </tr>
+              </thead>
+              <tbody>
+                <!-- Populated by JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Quick Summary statistics of classes -->
+        <div class="card">
+          <div class="card-title-container">
+            <h3 class="card-title"><i data-lucide="users"></i> Daftar Ringkasan Kelas</h3>
+          </div>
+          <div class="table-container">
+            <table class="custom-table" id="class-summary-table">
+              <thead>
+                <tr>
+                  <th>Kelas</th>
+                  <th>Jumlah Siswa</th>
+                  <th>Rata-rata Nilai</th>
+                  <th>Selesai Koreksi</th>
+                </tr>
+              </thead>
+              <tbody>
+                <!-- Populated by JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. DATA UJIAN VIEW -->
+    <section id="view-ujian" class="view-section">
+      <div class="filter-bar">
+        <h2>Data Ujian & Soal</h2>
+        <button class="btn btn-primary" id="add-exam-btn">
+          <i data-lucide="plus"></i>Tambah Ujian Baru
+        </button>
+      </div>
+
+      <div class="card">
+        <div class="card-title-container">
+          <h3 class="card-title"><i data-lucide="book-open"></i> Daftar Template Soal Ujian</h3>
+          <input type="text" id="search-exam" class="form-input" placeholder="Cari nama ujian atau mapel..."
+            style="width: 250px;">
+        </div>
+        <div class="table-container">
+          <table class="custom-table" id="exams-table">
+            <thead>
+              <tr>
+                <th>Nama Ujian</th>
+                <th>Mata Pelajaran (Mapel)</th>
+                <th>Kelas</th>
+                <th>Jumlah Soal</th>
+                <th>Total Bobot</th>
+                <th>Aksi</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- Populated by JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. DATA SISWA VIEW -->
+    <section id="view-siswa" class="view-section">
+      <div class="filter-bar">
+        <h2>Data Registrasi Siswa</h2>
+        <button class="btn btn-primary" id="add-student-btn">
+          <i data-lucide="plus"></i>Tambah Siswa
+        </button>
+      </div>
+
+      <div class="filter-bar">
+        <div class="class-filter-groups" id="student-class-filters">
+          <!-- Class Filter Buttons generated by JS -->
+        </div>
+        <input type="text" id="search-student" class="form-input" placeholder="Cari nama atau NISN..."
+          style="width: 250px;">
+      </div>
+
+      <div class="card">
+        <div class="table-container">
+          <table class="custom-table" id="students-table">
+            <thead>
+              <tr>
+                <th>Nama Lengkap</th>
+                <th>NISN</th>
+                <th>Kelas</th>
+                <th>Jurusan</th>
+                <th>Aksi</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- Populated by JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. KOREKSI VIEW (MAIN INTERACTIVE GRADING SCREEN) -->
+    <section id="view-koreksi" class="view-section">
+      <div class="filter-bar">
+        <h2>Koreksi Jawaban Siswa</h2>
+      </div>
+
+      <div class="grid-container grid-cols-12 mb-4">
+        <!-- Filter Card -->
+        <div class="card col-span-12">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Pilih Ujian</label>
+              <select id="koreksi-exam-select" class="form-input">
+                <option value="">-- Semua Ujian --</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Pilih Kelas</label>
+              <select id="koreksi-class-select" class="form-input">
+                <option value="">-- Semua Kelas --</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Status Koreksi</label>
+              <select id="koreksi-status-select" class="form-input">
+                <option value="">-- Semua Status --</option>
+                <option value="Selesai">Selesai</option>
+                <option value="Proses">Proses</option>
+                <option value="Belum">Belum Dikoreksi</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Student Exam Answer List -->
+      <div class="card">
+        <div class="card-title-container">
+          <h3 class="card-title"><i data-lucide="check-square"></i> Lembar Jawaban Siswa</h3>
+        </div>
+        <div class="table-container">
+          <table class="custom-table" id="corrections-table">
+            <thead>
+              <tr>
+                <th>Siswa</th>
+                <th>Kelas</th>
+                <th>Ujian</th>
+                <th>Status</th>
+                <th>Nilai Akhir</th>
+                <th>Aksi</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- Populated by JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5. EKSPORT VIEW -->
+    <section id="view-eksport" class="view-section">
+      <div class="filter-bar">
+        <h2>Eksport Nilai & Berita Acara</h2>
+      </div>
+
+      <div class="export-panel-grid">
+        <!-- Left Pane: Settings and Configurations -->
+        <div class="card">
+          <div class="card-title-container">
+            <h3 class="card-title"><i data-lucide="settings"></i> Konfigurasi Ekspor</h3>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Pilih Kelas</label>
+            <select id="export-class-select" class="form-input">
+              <option value="">-- Semua Kelas --</option>
+              <!-- Populated by JS -->
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Pilih Mata Pelajaran (Mapel)</label>
+            <div
+              style="max-height: 180px; overflow-y: auto; border: 1px solid var(--border-color); padding: 0.75rem; border-radius: var(--radius-md); background: var(--input-bg);"
+              id="export-subject-checkboxes">
+              <!-- Checkboxes generated by JS -->
+            </div>
+            <span class="stat-label" style="font-size: 0.75rem; margin-top: 0.25rem;">Centang beberapa untuk ekspor
+              banyak mapel sekaligus.</span>
+          </div>
+
+          <div class="form-group" style="margin-top: 1.5rem;">
+            <button class="btn btn-primary" style="width: 100%;" id="btn-export-excel">
+              <i data-lucide="download"></i>Ekspor Data Mentah Excel
+            </button>
+          </div>
+        </div>
+
+        <!-- Right Pane: Previews & Direct Action Exports -->
+        <div class="grid-container grid-cols-1" style="gap: 1.5rem;">
+          <!-- 1. PDF Report Card Section -->
+          <div class="card">
+            <div class="card-title-container">
+              <h3 class="card-title"><i data-lucide="file-text"></i> Ekspor Raport Hasil Ujian (PDF)</h3>
+            </div>
+            <p class="text-muted" style="font-size: 0.875rem; margin-bottom: 1rem;">
+              Cetak raport satuan persiswa yang siap dicetak/disimpan sebagai PDF secara rapi.
+            </p>
+            <div class="form-row" style="align-items: flex-end;">
+              <div class="form-group">
+                <label class="form-label">Pilih Siswa</label>
+                <select id="export-pdf-student-select" class="form-input">
+                  <option value="">-- Pilih Siswa --</option>
+                  <!-- Populated by JS -->
+                </select>
+              </div>
+              <div class="form-group">
+                <button class="btn btn-secondary"
+                  style="width: 100%; border-color: var(--primary); color: var(--primary);" id="btn-export-pdf">
+                  <i data-lucide="file-text"></i>Unduh PDF Raport
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 2. WhatsApp Berita Acara Generator Section -->
+          <div class="card">
+            <div class="card-title-container">
+              <h3 class="card-title"><i data-lucide="message-square"></i> Berita Acara Hasil Ujian (WhatsApp)</h3>
+            </div>
+            <p class="text-muted" style="font-size: 0.875rem; margin-bottom: 1rem;">
+              Buat ringkasan kelulusan kelas, rekap nilai tertinggi/terendah, dan kirimkan langsung via WhatsApp.
+            </p>
+
+            <div class="form-group">
+              <label class="form-label">Pilih Ujian untuk Berita Acara</label>
+              <select id="export-wa-exam-select" class="form-input">
+                <option value="">-- Pilih Ujian --</option>
+                <!-- Populated by JS -->
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Pratinjau Pesan WhatsApp</label>
+              <textarea id="wa-preview-text" class="form-input" rows="6" readonly
+                style="font-family: monospace; font-size: 0.85rem; background-color: var(--bg-base); resize: none;"></textarea>
+            </div>
+
+            <div class="form-row">
+              <button class="btn btn-secondary" id="btn-copy-wa">
+                <i data-lucide="copy"></i>Salin Teks
+              </button>
+              <button class="btn btn-primary" id="btn-send-wa">
+                <i data-lucide="message-square"></i>Kirim Berita Acara via WhatsApp
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 6. SETTINGS & PROFILE VIEW -->
+    <section id="view-setting" class="view-section">
+      <div class="filter-bar">
+        <h2>Pengaturan Aplikasi & Profil</h2>
+      </div>
+
+      <div class="card">
+        <div class="profile-settings-wrapper">
+          <!-- Left: Profile Photo / Avatar settings -->
+          <div>
+            <h3 class="card-title mb-4"><i data-lucide="users"></i> Profil & Avatar</h3>
+
+            <div style="display: flex; flex-direction: column; align-items: center; gap: 1rem; margin-bottom: 1.5rem;">
+              <div class="teacher-avatar-wrapper" style="width: 120px; height: 120px; border-width: 3px;">
+                <img src="" alt="Avatar" class="teacher-avatar-img" id="setting-avatar-preview">
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 0.5rem; width: 100%;">
+                <!-- File upload button -->
+                <label class="btn btn-secondary btn-sm" style="display: flex; cursor: pointer; text-align: center;">
+                  <i data-lucide="download"></i>Unggah Foto Profil
+                  <input type="file" id="setting-upload-photo" accept="image/*" style="display: none;">
+                </label>
+                <button class="btn btn-danger btn-sm" id="btn-reset-photo" style="display: none;">
+                  Hapus Foto Custom
+                </button>
+              </div>
+            </div>
+
+            <label class="form-label">Pilih Avatar Default</label>
+            <div class="avatar-grid" id="avatar-grid-container">
+              <!-- 8 Predefined avatars generated by JS -->
+            </div>
+          </div>
+
+          <!-- Right: Profile details & Theme configuration -->
+          <div style="border-left: 1px solid var(--border-color); padding-left: 2rem;">
+            <h3 class="card-title mb-4"><i data-lucide="settings"></i> Detail Profil Guru</h3>
+
+            <form id="profile-form">
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label">Nama Lengkap</label>
+                  <input type="text" id="setting-name" class="form-input" required>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">NIP</label>
+                  <input type="text" id="setting-nip" class="form-input" required>
+                </div>
+              </div>
+
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label">Nama Sekolah / Instansi</label>
+                  <input type="text" id="setting-school" class="form-input" required>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Tahun Ajaran</label>
+                  <input type="text" id="setting-year" class="form-input" required>
+                </div>
+              </div>
+
+              <h3 class="card-title mt-4 mb-4"><i data-lucide="layout-dashboard"></i> Tampilan & Tema</h3>
+
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label">Warna Aksen Tema</label>
+                  <div class="theme-picker-wrapper" id="theme-picker-container">
+                    <div class="theme-dot theme-dot-blue active" data-theme="blue" title="Royal Blue"></div>
+                    <div class="theme-dot theme-dot-green" data-theme="green" title="Emerald Green"></div>
+                    <div class="theme-dot theme-dot-violet" data-theme="violet" title="Vibrant Violet"></div>
+                    <div class="theme-dot theme-dot-amber" data-theme="amber" title="Sunset Amber"></div>
+                  </div>
+                </div>
+                <div class="form-group" style="justify-content: center;">
+                  <label class="form-label">Mode Tampilan</label>
+                  <button type="button" class="btn btn-secondary" id="setting-toggle-dark-mode" style="width: 100%;">
+                    <i data-lucide="moon"></i>Aktifkan Mode Gelap
+                  </button>
+                </div>
+              </div>
+
+              <div style="margin-top: 2rem; display: flex; justify-content: flex-end;">
+                <button type="submit" class="btn btn-primary">
+                  <i data-lucide="save"></i>Simpan Perubahan
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- 7. MODALS -->
+
+  <!-- A. EXAM MANAGEMENT MODAL (Create/Edit Exam) -->
+  <div class="modal-overlay" id="exam-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="exam-modal-title">Tambah Ujian Baru</h3>
+        <button class="action-btn" id="close-exam-modal"><i data-lucide="x"></i></button>
+      </div>
+      <div class="modal-body">
+        <form id="exam-form">
+          <input type="hidden" id="form-exam-id">
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Nama Ujian</label>
+              <input type="text" id="form-exam-name" class="form-input" placeholder="Contoh: PH 1 Kebugaran Jasmani"
+                required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Mata Pelajaran (Mapel)</label>
+              <input type="text" id="form-exam-subject" class="form-input"
+                placeholder="Contoh: PJOK, IPA, Agama, Matematika" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Kelas Sasaran</label>
+              <input type="text" id="form-exam-class" class="form-input" placeholder="Contoh: XI-MIPA-1" required>
+            </div>
+          </div>
+
+          <!-- Bulk question generator tool -->
+          <div class="questions-builder-container">
+            <div class="builder-header">
+              <h4>Daftar Soal & Kunci Jawaban</h4>
+              <div class="bulk-generate-wrapper">
+                <input type="number" id="bulk-question-count" class="form-input" min="1" max="100"
+                  placeholder="Jml Soal" style="width: 100px;">
+                <button type="button" class="btn btn-secondary btn-sm" id="btn-bulk-generate-questions">
+                  Buat Butir Soal sekaligus
+                </button>
+              </div>
+            </div>
+
+            <!-- List of dynamic question rows -->
+            <div id="modal-questions-list"
+              style="display: flex; flex-direction: column; gap: 1rem; max-height: 400px; overflow-y: auto; padding: 0.5rem;">
+              <!-- Question rows injected by JS -->
+            </div>
+
+            <!-- Total weight summary indicator -->
+            <div class="weight-sum-indicator">
+              <span>Total Bobot Nilai: <span id="form-total-weight">0</span> / 100</span>
+              <span id="weight-validation-status" style="font-size: 0.85rem;"></span>
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="cancel-exam-modal">Batal</button>
+        <button class="btn btn-primary" id="save-exam-btn">Simpan Ujian</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- B. STUDENT MANAGEMENT MODAL (Create/Edit Student) -->
+  <div class="modal-overlay" id="student-modal">
+    <div class="modal-content" style="max-width: 500px;">
+      <div class="modal-header">
+        <h3 id="student-modal-title">Tambah Siswa</h3>
+        <button class="action-btn" id="close-student-modal"><i data-lucide="x"></i></button>
+      </div>
+      <div class="modal-body">
+        <form id="student-form">
+          <input type="hidden" id="form-student-id">
+
+          <div class="form-group">
+            <label class="form-label">Nama Lengkap</label>
+            <input type="text" id="form-student-name" class="form-input" placeholder="Contoh: Ahmad Dhani" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">NISN (10 Digit)</label>
+            <input type="text" id="form-student-nisn" class="form-input" placeholder="Contoh: 0082910401"
+              pattern="[0-9]{10}" required>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Kelas</label>
+              <input type="text" id="form-student-class" class="form-input" placeholder="Contoh: XI-MIPA-1" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Jurusan</label>
+              <select id="form-student-major" class="form-input" required>
+                <option value="MIPA">MIPA</option>
+                <option value="IPS">IPS</option>
+                <option value="Bahasa">Bahasa</option>
+                <option value="Kejuruan">Kejuruan</option>
+                <option value="Agama">Agama</option>
+              </select>
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="cancel-student-modal">Batal</button>
+        <button class="btn btn-primary" id="save-student-btn">Simpan Siswa</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- C. EXAM CORRECTION PANEL MODAL -->
+  <div class="modal-overlay" id="correction-modal">
+    <div class="modal-content" style="max-width: 950px; max-height: 95vh;">
+      <div class="modal-header">
+        <div>
+          <h3 id="correction-modal-title">Koreksi Lembar Jawaban</h3>
+          <p class="text-muted" id="correction-modal-subtitle" style="font-size: 0.85rem; margin-top: 0.25rem;"></p>
+        </div>
+        <button class="action-btn" id="close-correction-modal"><i data-lucide="x"></i></button>
+      </div>
+      <div class="modal-body" style="background-color: var(--bg-base);">
+        <div class="correction-split-container">
+
+          <!-- Left: Questions, Keys, Student Answers & Scoring -->
+          <div style="max-height: 60vh; overflow-y: auto; padding-right: 0.5rem;" id="correction-questions-list">
+            <!-- Question scoring blocks generated by JS -->
+          </div>
+
+          <!-- Right: Summary, Override Inputs & Direct Answer Correction -->
+          <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+            <!-- Scoring summary card -->
+            <div class="card" style="padding: 1.25rem;">
+              <h4 class="mb-4">Ringkasan Penilaian</h4>
+
+              <div style="display: flex; justify-content: space-around; text-align: center; margin-bottom: 1.5rem;">
+                <div>
+                  <span class="stat-label">Total Nilai</span>
+                  <div class="stat-value" id="correction-summary-total"
+                    style="color: var(--primary); font-size: 2.5rem; margin-top: 0.25rem;">0</div>
+                </div>
+                <div>
+                  <span class="stat-label">Status Lembar</span>
+                  <div class="mt-3">
+                    <select id="correction-form-status" class="form-input"
+                      style="padding: 0.4rem 0.8rem; font-size: 0.9rem; font-weight: 700; width: auto; text-align: center;">
+                      <option value="Belum">Belum</option>
+                      <option value="Proses">Proses</option>
+                      <option value="Selesai">Selesai</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <!-- General info summary list -->
+              <div
+                style="display: flex; flex-direction: column; gap: 0.5rem; font-size: 0.875rem; border-top: 1px solid var(--border-color); padding-top: 1rem;">
+                <div class="flex-between">
+                  <span class="text-muted">Total Soal:</span>
+                  <span id="correction-summary-count" class="form-label" style="margin:0;">-</span>
+                </div>
+                <div class="flex-between">
+                  <span class="text-muted">Jawaban Benar:</span>
+                  <span id="correction-summary-correct" class="form-label"
+                    style="margin:0; color: var(--success);">-</span>
+                </div>
+                <div class="flex-between">
+                  <span class="text-muted">Jawaban Salah/Esai:</span>
+                  <span id="correction-summary-wrong" class="form-label"
+                    style="margin:0; color: var(--danger);">-</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Fast Edit Answers Area (allows altering inputs directly in case of scan error) -->
+            <div class="card" style="padding: 1.25rem; flex: 1; display: flex; flex-direction: column;">
+              <h4 class="mb-4">Perbaiki Jawaban Siswa Yang Keliru</h4>
+              <p class="text-muted" style="font-size: 0.75rem; margin-bottom: 1rem;">
+                Gunakan editor di bawah untuk mengganti data respon mentah siswa jika terdapat kesalahan ketik/input.
+                Nilai akan dihitung ulang secara otomatis.
+              </p>
+
+              <div
+                style="overflow-y: auto; flex: 1; max-height: 250px; display: flex; flex-direction: column; gap: 0.75rem;"
+                id="correction-answer-editors">
+                <!-- Answer inputs generated by JS -->
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="cancel-correction-modal">Batal</button>
+        <button class="btn btn-primary" id="save-correction-btn">Simpan Hasil Koreksi</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 8. HIDDEN PDF REPORT CARD LAYOUT (rendered dynamically when exporting PDF) -->
+  <div id="report-card-printout">
+    <div style="font-family: 'Times New Roman', Times, serif; color: black; line-height: 1.4; padding: 20px;">
+      <!-- Report card header logo + info -->
+      <div
+        style="display: flex; align-items: center; border-bottom: 3px double black; padding-bottom: 15px; margin-bottom: 25px;">
+        <div style="flex: 1; text-align: center;">
+          <h2
+            style="font-size: 1.5rem; text-transform: uppercase; margin: 0; font-weight: 800; letter-spacing: 0.05em;">
+            Pemerintah Provinsi DKI Jakarta</h2>
+          <h1
+            style="font-size: 1.8rem; text-transform: uppercase; margin: 5px 0; font-weight: 900; letter-spacing: 0.05em;"
+            id="pdf-school-header">SMA NEGERI 1 JAKARTA</h1>
+          <p style="margin: 0; font-size: 0.9rem; font-style: italic;">Jl. Budi Utomo No.7, Jakarta Pusat, Kode Pos:
+            10710</p>
+        </div>
+      </div>
+
+      <h2
+        style="text-align: center; text-decoration: underline; text-transform: uppercase; margin-bottom: 25px; font-size: 1.3rem; font-weight: 700;">
+        Laporan Hasil Penilaian Ujian Siswa</h2>
+
+      <!-- Student details section -->
+      <table style="width: 100%; border: none; font-size: 1.05rem; margin-bottom: 25px;">
+        <tr>
+          <td style="width: 15%; padding: 4px 0; font-weight: bold;">Nama Siswa</td>
+          <td style="width: 2%; padding: 4px 0;">:</td>
+          <td style="width: 33%; padding: 4px 0;" id="pdf-student-name">-</td>
+          <td style="width: 15%; padding: 4px 0; font-weight: bold;">Tahun Pelajaran</td>
+          <td style="width: 2%; padding: 4px 0;">:</td>
+          <td style="width: 33%; padding: 4px 0;" id="pdf-academic-year">-</td>
+        </tr>
+        <tr>
+          <td style="padding: 4px 0; font-weight: bold;">NISN</td>
+          <td style="padding: 4px 0;">:</td>
+          <td style="padding: 4px 0;" id="pdf-student-nisn">-</td>
+          <td style="padding: 4px 0; font-weight: bold;">Guru Pengampu</td>
+          <td style="padding: 4px 0;">:</td>
+          <td style="padding: 4px 0;" id="pdf-teacher-name">-</td>
+        </tr>
+        <tr>
+          <td style="padding: 4px 0; font-weight: bold;">Kelas / Jurusan</td>
+          <td style="padding: 4px 0;">:</td>
+          <td style="padding: 4px 0;" id="pdf-student-class">-</td>
+          <td style="padding: 4px 0; font-weight: bold;">NIP Guru</td>
+          <td style="padding: 4px 0;">:</td>
+          <td style="padding: 4px 0;" id="pdf-teacher-nip">-</td>
+        </tr>
+      </table>
+
+      <!-- Dynamic Report card table -->
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 40px; font-size: 1rem;">
+        <thead>
+          <tr style="background-color: #f2f2f2;">
+            <th style="border: 1px solid black; padding: 10px; text-align: center; width: 8%;">No</th>
+            <th style="border: 1px solid black; padding: 10px; text-align: left;">Mata Pelajaran (Mapel)</th>
+            <th style="border: 1px solid black; padding: 10px; text-align: left;">Nama Ujian</th>
+            <th style="border: 1px solid black; padding: 10px; text-align: center; width: 15%;">Nilai</th>
+            <th style="border: 1px solid black; padding: 10px; text-align: center; width: 20%;">Predikat</th>
+          </tr>
+        </thead>
+        <tbody id="pdf-grades-tbody">
+          <!-- Rows dynamically loaded by JS -->
+        </tbody>
+      </table>
+
+      <!-- Bottom Signatures row -->
+      <div style="display: flex; justify-content: space-between; margin-top: 50px; font-size: 1.05rem;">
+        <div style="text-align: center; width: 35%;">
+          <p style="margin-bottom: 70px;">Mengetahui,<br>Orang Tua / Wali Siswa</p>
+          <p style="text-decoration: underline; font-weight: bold;">......................................</p>
+        </div>
+        <div style="text-align: center; width: 35%;">
+          <p style="margin-bottom: 70px;" id="pdf-date-location">Jakarta, 10 Juni 2026<br>Guru Mata Pelajaran</p>
+          <p style="text-decoration: underline; font-weight: bold;" id="pdf-teacher-signature">-</p>
+          <p style="margin: 0; font-size: 0.9rem;" id="pdf-teacher-signature-nip">NIP: -</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Seed Data & Application scripts -->
+  <script src="js/data.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/app.js"></script>
+</body>
+
+</html>

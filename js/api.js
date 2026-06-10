@@ -7,7 +7,7 @@
  * 2. Ganti nilai GAS_URL di bawah dengan URL deployment Anda
  */
 
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbzHi3M2X1JoXmTWt0jkLvZVHS-ufjqght1W_ZbdHVmMUkfQZTdJIX1O_1yzeor3TtzL/exec';
+const GAS_URL = https://script.google.com/macros/s/AKfycbzHi3M2X1JoXmTWt0jkLvZVHS-ufjqght1W_ZbdHVmMUkfQZTdJIX1O_1yzeor3TtzL/exec;
 
 // ============================================================
 // CORE API CLIENT

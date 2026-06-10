@@ -355,7 +355,8 @@ const DB = {
       sheet: KS_API.SHEETS.TEACHERS,
       teacherId: KS_API.teacherId
     });
-    const found = result.data.find(t => t.id === KS_API.teacherId);
+    const data = result.data || [];
+    const found = data.find(t => t.id === KS_API.teacherId);
     if (found) localStorage.setItem('ks_profile', JSON.stringify(found));
     return found || null;
   },
@@ -380,8 +381,9 @@ const DB = {
       return saved ? JSON.parse(saved) : [];
     }
     const result = await KS_API.getAll(KS_API.SHEETS.STUDENTS);
-    localStorage.setItem('ks_students', JSON.stringify(result.data));
-    return result.data;
+    const students = result.data || [];
+    localStorage.setItem('ks_students', JSON.stringify(students));
+    return students;
   },
 
   async saveStudent(student) {
@@ -428,6 +430,9 @@ const DB = {
       if (typeof ex.questions === 'string') {
         try { ex.questions = JSON.parse(ex.questions); } catch(e) { ex.questions = []; }
       }
+      if (!Array.isArray(ex.questions)) {
+        ex.questions = [];
+      }
       return ex;
     });
     localStorage.setItem('ks_exams', JSON.stringify(exams));
@@ -469,8 +474,14 @@ const DB = {
       if (typeof sub.answers === 'string') {
         try { sub.answers = JSON.parse(sub.answers); } catch(e) { sub.answers = {}; }
       }
+      if (!sub.answers || typeof sub.answers !== 'object' || Array.isArray(sub.answers)) {
+        sub.answers = {};
+      }
       if (typeof sub.scores === 'string') {
         try { sub.scores = JSON.parse(sub.scores); } catch(e) { sub.scores = {}; }
+      }
+      if (!sub.scores || typeof sub.scores !== 'object' || Array.isArray(sub.scores)) {
+        sub.scores = {};
       }
       return sub;
     });
@@ -558,7 +569,8 @@ const DB = {
       return saved ? JSON.parse(saved) : [];
     }
     const result = await KS_API.getAll(KS_API.SHEETS.ACTIVITIES);
-    return result.data.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    const data = result.data || [];
+    return data.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
   },
 
   async saveActivity(activity) {

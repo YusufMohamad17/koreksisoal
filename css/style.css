@@ -491,7 +491,82 @@ textarea.form-input { resize: vertical; }
    ============================================= */
 @media (max-width: 1024px) {
   .export-panel-grid { grid-template-columns: 1fr; }
-  .nav-link { padding: 0.45rem 0.7rem; font-size: 0.82rem; }
+  .nav-link { padding: 0.45rem 0.65rem; font-size: 0.8rem; gap: 0.3rem; }
+  .nav-link i { width: 15px; height: 15px; }
+}
+
+/* =============================================
+   RESPONSIVE - TABLET LANDSCAPE (max 1024px, min 769px)
+   Navbar icons-only, label hidden
+   ============================================= */
+@media (max-width: 1024px) and (min-width: 769px) {
+  :root { --header-height: 60px; }
+
+  .main-header {
+    padding: 0 0.85rem;
+    gap: 0.5rem;
+    flex-wrap: nowrap;
+    overflow: visible;
+  }
+
+  /* Brand: hanya logo + nama, sembunyikan info guru */
+  .brand-section { gap: 0.5rem; flex-shrink: 0; }
+  .teacher-profile-header { display: none; }
+
+  /* Nav: icons only, label hidden, compact */
+  .desktop-nav {
+    display: flex;
+    flex: 1;
+    justify-content: center;
+    gap: 0.15rem;
+    min-width: 0;
+    overflow: hidden;
+  }
+  .nav-link {
+    flex-direction: column;
+    padding: 0.35rem 0.5rem;
+    font-size: 0.65rem;
+    gap: 0.2rem;
+    white-space: nowrap;
+    min-width: 0;
+  }
+  .nav-link i { width: 18px; height: 18px; }
+
+  /* Header actions: pastikan tidak terpotong */
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex-shrink: 0;
+  }
+  .action-btn {
+    width: 36px;
+    height: 36px;
+    flex-shrink: 0;
+  }
+}
+
+/* =============================================
+   RESPONSIVE - TABLET PORTRAIT (769px – 900px)
+   Nav icons+label kecil, teacher profile hidden
+   ============================================= */
+@media (max-width: 900px) and (min-width: 769px) {
+  /* Sembunyikan label teks nav, hanya icon */
+  .nav-link span,
+  .nav-link > :not(i) {
+    display: none;
+  }
+  .nav-link {
+    padding: 0.45rem 0.6rem;
+    flex-direction: row;
+  }
+  .nav-link i { width: 20px; height: 20px; }
+
+  /* Perkecil brand name sedikit */
+  .brand-name { font-size: 0.95rem; }
+  .brand-logo { width: 34px; height: 34px; }
+
+  .main-header { padding: 0 0.75rem; }
 }
 
 /* =============================================

@@ -377,26 +377,23 @@ class KoreksiSoalApp {
   }
 
   renderDbModeBadge() {
-    // Tampilkan indikator mode di header
     let badge = document.getElementById('db-mode-badge');
     if (!badge) {
       badge = document.createElement('span');
       badge.id = 'db-mode-badge';
-      badge.style.cssText = 'font-size:0.7rem; padding:2px 8px; border-radius:99px; font-weight:700; margin-left:8px; vertical-align:middle; cursor:default;';
+      badge.style.cssText = 'display:inline-block; width:10px; height:10px; border-radius:50%; margin-left:8px; vertical-align:middle; flex-shrink:0; cursor:default; border:2px solid rgba(0,0,0,0.1);';
       const brandName = document.querySelector('.brand-name');
       if (brandName) brandName.appendChild(badge);
     }
     const hasToken = !!localStorage.getItem('ks_session_token');
     if (DB.mode === 'online') {
-      badge.textContent = hasToken ? '🟢 Online (Multi-device)' : '🟢 Online';
-      badge.style.background = '#dcfce7'; badge.style.color = '#166534';
-      badge.title = hasToken
-        ? 'Terhubung ke Google Spreadsheet — Sesi aktif di beberapa perangkat'
-        : 'Terhubung ke Google Spreadsheet';
+      badge.style.background = '#22c55e';
+      badge.style.boxShadow = '0 0 0 2px rgba(34,197,94,0.25)';
+      badge.title = hasToken ? 'Online · Multi-device' : 'Online · Google Spreadsheet';
     } else {
-      badge.textContent = '🟡 Offline';
-      badge.style.background = '#fef9c3'; badge.style.color = '#854d0e';
-      badge.title = 'Menyimpan data di browser lokal';
+      badge.style.background = '#eab308';
+      badge.style.boxShadow = '0 0 0 2px rgba(234,179,8,0.25)';
+      badge.title = 'Offline · Data tersimpan di browser';
     }
   }
 
@@ -927,7 +924,9 @@ class KoreksiSoalApp {
     } else if (type === 'BS') {
       keyHtml = this.generateBSOptionsHtml(index, key);
     } else if (type === 'ES') {
-      keyHtml = `<input type="text" class="form-input q-key-input" value="${key || ''}" placeholder="Kata kunci penilai (pisahkan dengan koma), contoh: otot, cedera, darah" style="font-size:0.85rem;">`;
+      keyHtml = `
+        <input type="text" class="form-input q-key-input" value="${key || ''}" placeholder="Kata kunci penilai (pisahkan koma), contoh: otot, cedera, darah. Kosongkan = nilai manual." style="font-size:0.85rem;">
+      `;
     }
 
     rowDiv.innerHTML = `
@@ -935,7 +934,7 @@ class KoreksiSoalApp {
       <div class="q-content-inputs">
         <div class="form-row" style="grid-template-columns: 2fr 1fr 1fr;">
           <div class="form-group" style="margin-bottom:0;">
-            <input type="text" class="form-input q-text-input" value="${text}" placeholder="Tuliskan butir teks soal..." required>
+            <input type="text" class="form-input q-text-input" value="${text}" placeholder="Teks soal (opsional — boleh dikosongkan)">
           </div>
           <div class="form-group" style="margin-bottom:0;">
             <select class="form-input q-type-select" onchange="app.handleQuestionTypeChange(${index}, this.value)">
@@ -1142,11 +1141,7 @@ class KoreksiSoalApp {
       
       weightSum += weight;
 
-      if (!text) {
-        alert(`Soal nomor ${qIndex} tidak boleh kosong!`);
-        valid = false;
-        return;
-      }
+      // Teks soal boleh dikosongkan untuk semua tipe — agar tidak membebani server
 
       // Collect key value
       let key = '';
@@ -1161,9 +1156,12 @@ class KoreksiSoalApp {
         const selectedBtn = card.querySelector('.bs-toggle-btn.selected');
         key = selectedBtn ? selectedBtn.innerText : '';
       } else if (type === 'ES') {
-        key = card.querySelector('.q-key-input').value.trim();
+        const keyInput = card.querySelector('.q-key-input');
+        key = keyInput ? keyInput.value.trim() : '';
+        // Kunci jawaban esai boleh dikosongkan — dinilai manual oleh guru
       }
 
+      // Kunci jawaban wajib hanya untuk soal non-esai
       if (type !== 'ES' && !key) {
         alert(`Harap tentukan kunci jawaban untuk soal nomor ${qIndex}!`);
         valid = false;
@@ -1728,9 +1726,9 @@ class KoreksiSoalApp {
     total = parseFloat(total.toFixed(1));
     
     document.getElementById('correction-summary-total').innerText = total;
-    document.getElementById('correction-summary-count').innerText = `${totalQuestions} Soal`;
-    document.getElementById('correction-summary-correct').innerText = `${correctCount} Benar`;
-    document.getElementById('correction-summary-wrong').innerText = `${wrongCount} Salah/Esai`;
+    document.getElementById('correction-summary-count').innerText = `${totalQuestions} soal`;
+    document.getElementById('correction-summary-correct').innerText = `✓ ${correctCount} benar`;
+    document.getElementById('correction-summary-wrong').innerText = `✗ ${wrongCount} salah/esai`;
   }
 
   // Listens to edits inside the "Perbaiki Jawaban Siswa Yang Keliru" section
@@ -1814,12 +1812,22 @@ class KoreksiSoalApp {
       }
     }
 
-    // Update Card UI
-    const badgeContainer = card.querySelector('.badge');
-    badgeContainer.className = 'badge ' + (question.type === 'ES' ? 'badge-info' : (isCorrect ? 'badge-success' : 'badge-danger'));
-    badgeContainer.innerText = question.type === 'ES' ? 'Esai' : (isCorrect ? 'Benar' : 'Salah');
+    // Update badge status (Benar/Salah/Esai) di correction-header-row
+    const headerRow = card.querySelector('.correction-header-row');
+    const badgeContainer = headerRow ? headerRow.querySelector('.badge') : card.querySelector('.badge');
+    if (badgeContainer) {
+      badgeContainer.className = 'badge ' + (question.type === 'ES' ? 'badge-info' : (isCorrect ? 'badge-success' : 'badge-danger'));
+      badgeContainer.innerText = question.type === 'ES' ? 'Esai' : (isCorrect ? 'Benar' : 'Salah');
+    }
 
-    card.querySelector('.compare-value:nth-child(2)').innerText = Array.isArray(newVal) ? newVal.join(', ') : (newVal || 'Kosong');
+    // Update tampilan "Respon Siswa" (compare-block kedua) — cari dengan index yang benar
+    const compareBlocks = card.querySelectorAll('.compare-block');
+    if (compareBlocks.length >= 2) {
+      const studAnsEl = compareBlocks[1].querySelector('.compare-value');
+      if (studAnsEl) {
+        studAnsEl.innerText = Array.isArray(newVal) ? newVal.join(', ') : (newVal || 'Kosong');
+      }
+    }
     
     // Update key matching display if exists
     const matchHint = card.querySelector('.keyword-match-hint');
@@ -2585,6 +2593,7 @@ Catatan: Laporan ini dibuat otomatis secara resmi oleh sistem *KoreksiSoal*. Ter
   }
 
   buildKopHtml({ title, schoolName, address, city, phone, email, website, logo }) {
+    // Logo kiri dan kanan identik agar teks kop tepat di tengah
     const logoHtml = logo
       ? `<img src="${logo}" style="width:70px;height:70px;object-fit:contain;flex-shrink:0;" alt="Logo Sekolah">`
       : `<div style="width:70px;height:70px;border:2px dashed #aaa;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:0.6rem;color:#999;text-align:center;">Logo<br>Sekolah</div>`;
@@ -2604,6 +2613,7 @@ Catatan: Laporan ini dibuat otomatis secara resmi oleh sistem *KoreksiSoal*. Ter
           ${address ? `<p style="font-size:0.78rem;">${address}${city ? ', ' + city : ''}</p>` : ''}
           ${contact ? `<p style="font-size:0.75rem;color:#555;">${contact}</p>` : ''}
         </div>
+        ${logoHtml}
       </div>
     `;
   }

@@ -100,6 +100,12 @@ body.dark-mode .main-header { background-color: rgba(17,24,39,0.88); }
   background: linear-gradient(to right, var(--primary), hsl(var(--primary-h),var(--primary-s),calc(var(--primary-l) - 20%)));
   -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
   white-space: nowrap;
+  display: inline-flex; align-items: center; gap: 4px;
+}
+/* Status dot — selalu terikat dengan brand-name */
+#db-mode-badge {
+  -webkit-text-fill-color: initial; /* Override gradient text */
+  flex-shrink: 0;
 }
 body.dark-mode .brand-name {
   background: linear-gradient(to right, #ffffff, hsl(var(--primary-h),var(--primary-s),80%));

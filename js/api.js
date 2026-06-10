@@ -27,19 +27,9 @@ const KS_API = {
    * @param {object} payload - Data tambahan
    * @param {boolean} isPost - true = POST, false = GET
    */
-  // Timeout (ms) untuk setiap request — bisa diubah sesuai kebutuhan
-  REQUEST_TIMEOUT_MS: 15000,
-
   async call(action, payload = {}, isPost = false) {
     try {
       let response;
-
-      // AbortController untuk membatalkan fetch jika melebihi batas waktu
-      const controller = new AbortController();
-      const timeoutId = setTimeout(
-        () => controller.abort(),
-        this.REQUEST_TIMEOUT_MS
-      );
 
       // Sertakan session token di setiap request agar server bisa
       // memvalidasi sesi dari device manapun (multi-device support)
@@ -47,26 +37,17 @@ const KS_API = {
       const basePayload = { action, ...payload };
       if (sessionToken) basePayload.sessionToken = sessionToken;
 
-      try {
-        if (isPost) {
-          response = await fetch(GAS_URL, {
-            method: 'POST',
-            // redirect: 'follow' diperlukan karena GAS memakai redirect
-            redirect: 'follow',
-            headers: { 'Content-Type': 'text/plain' },
-            body: JSON.stringify(basePayload),
-            signal: controller.signal
-          });
-        } else {
-          const params = new URLSearchParams(basePayload);
-          response = await fetch(`${GAS_URL}?${params}`, {
-            redirect: 'follow',
-            signal: controller.signal
-          });
-        }
-      } finally {
-        // Bersihkan timeout agar tidak memory leak setelah fetch selesai
-        clearTimeout(timeoutId);
+      if (isPost) {
+        response = await fetch(GAS_URL, {
+          method: 'POST',
+          // redirect: 'follow' diperlukan karena GAS memakai redirect
+          redirect: 'follow',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify(basePayload)
+        });
+      } else {
+        const params = new URLSearchParams(basePayload);
+        response = await fetch(`${GAS_URL}?${params}`, { redirect: 'follow' });
       }
 
       const result = await response.json();
@@ -90,10 +71,6 @@ const KS_API = {
       if (GAS_URL.includes('GANTI_DENGAN')) {
         console.warn('[KS_API] URL API belum dikonfigurasi. Gunakan mode offline (localStorage).');
         throw new Error('API_NOT_CONFIGURED');
-      }
-      // Ubah error AbortError menjadi pesan yang lebih informatif
-      if (err.name === 'AbortError') {
-        throw new Error(`Request timeout: server tidak merespons dalam ${this.REQUEST_TIMEOUT_MS / 1000} detik.`);
       }
       throw err;
     }
@@ -169,15 +146,10 @@ const DB = {
     }
 
     try {
-      // Ping ringan ke API dengan batas waktu 8 detik.
-      // Jika server cold-start atau koneksi lambat, kita tidak membiarkan
-      // loader global aktif selamanya — fallback ke offline otomatis.
-      const PING_TIMEOUT_MS = 8000;
-      const pingPromise    = KS_API.call('ping', {});
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Ping timeout')), PING_TIMEOUT_MS)
-      );
-      await Promise.race([pingPromise, timeoutPromise]);
+      // Ping ringan ke API — gunakan action 'ping' khusus
+      // Server harus menangani action 'ping' dan mengembalikan { ok: true }
+      // Jika server belum punya handler ping, fallback ke getAll dengan teacherId dummy
+      await KS_API.call('ping', {});
       this.mode = 'online';
       console.info('[DB] Mode: ONLINE (Google Spreadsheet)');
     } catch (e) {

@@ -150,12 +150,20 @@ const DB = {
 
   async login(nip, password) {
     if (this.mode !== 'online') {
-      // Offline: cek hanya berdasarkan NIP yang tersimpan di localStorage
+      // Offline: cek NIP dan password
       const saved = localStorage.getItem('ks_profile');
       if (saved) {
         const profile = JSON.parse(saved);
+        const savedPwd = localStorage.getItem('ks_password');
         if (profile.nip === nip) {
-          return { success: true, teacher: profile };
+          // Jika belum ada password tersimpan, izinkan login pertama kali
+          if (!savedPwd || savedPwd === password) {
+            return { success: true, teacher: profile };
+          } else {
+            return { success: false, error: 'Password salah.' };
+          }
+        } else {
+          return { success: false, error: 'NIP tidak ditemukan.' };
         }
       }
       // Offline pertama kali: izinkan login dengan NIP apa saja
@@ -178,7 +186,9 @@ const DB = {
         id: 'offline-' + Date.now(),
         ...profileData
       };
+      delete offlineTeacher.password; // jangan simpan password di profile
       localStorage.setItem('ks_profile', JSON.stringify(offlineTeacher));
+      if (profileData.password) localStorage.setItem('ks_password', profileData.password);
       return { success: true, teacher: offlineTeacher };
     }
 
@@ -203,6 +213,23 @@ const DB = {
   logout() {
     KS_API.teacherId = null;
     localStorage.removeItem('ks_teacherId');
+    // Note: ks_profile, ks_password, dan data lain tetap tersimpan untuk re-login
+  },
+
+  async changePassword(oldPassword, newPassword) {
+    const savedPwd = localStorage.getItem('ks_password') || '';
+    if (savedPwd && savedPwd !== oldPassword) {
+      return { success: false, error: 'Password lama salah.' };
+    }
+    localStorage.setItem('ks_password', newPassword);
+    if (this.mode === 'online') {
+      try {
+        return await KS_API.call('changePassword', { teacherId: KS_API.teacherId, newPassword }, true);
+      } catch(e) {
+        return { success: true }; // saved locally at least
+      }
+    }
+    return { success: true };
   },
 
   // ============================================================

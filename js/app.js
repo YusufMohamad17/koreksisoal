@@ -76,10 +76,10 @@ class KoreksiSoalApp {
       ]);
 
       this.profile    = profile    || { ...DEFAULT_PROFILE };
-      this.students   = students.length   ? students   : [...DEFAULT_STUDENTS];
-      this.exams      = exams.length      ? exams      : [...DEFAULT_EXAMS];
-      this.submissions= submissions.length? submissions : [...DEFAULT_SUBMISSIONS];
-      this.activities = activities.length ? activities  : [...DEFAULT_ACTIVITIES];
+      this.students   = students   || [];
+      this.exams      = exams      || [];
+      this.submissions= submissions|| [];
+      this.activities = activities || [];
 
       // Tampilkan badge mode di header
       this.renderDbModeBadge();
@@ -106,6 +106,29 @@ class KoreksiSoalApp {
       console.error('[saveItem]', type, err);
       this.showToast('Gagal menyimpan: ' + err.message, 'error');
     }
+  }
+
+  // Logout handler
+  logout() {
+    DB.logout();
+    // Clear all app data from memory
+    this.profile = {};
+    this.students = [];
+    this.exams = [];
+    this.submissions = [];
+    this.activities = [];
+    // Remove login overlay if exists then show fresh login screen
+    const existingOverlay = document.getElementById('login-overlay');
+    if (existingOverlay) existingOverlay.remove();
+    this.showLoginScreen();
+  }
+
+  showLogoutModal() {
+    document.getElementById('logout-modal').classList.add('active');
+  }
+
+  hideLogoutModal() {
+    document.getElementById('logout-modal').classList.remove('active');
   }
 
   // Legacy saveState: simpan theme & darkmode saja (data lain disimpan per-item)
@@ -172,6 +195,10 @@ class KoreksiSoalApp {
             <div class="form-group">
               <label class="form-label">Password</label>
               <input type="password" id="reg-password" class="form-input" placeholder="Buat password">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Konfirmasi Password</label>
+              <input type="password" id="reg-password-confirm" class="form-input" placeholder="Ulangi password Anda">
             </div>
             <button class="btn btn-primary" style="width:100%; margin-top:0.5rem;" id="btn-do-register">
               <i data-lucide="user-plus"></i> Daftar & Masuk
@@ -256,12 +283,18 @@ class KoreksiSoalApp {
     const errEl = document.getElementById('login-error');
     errEl.style.display = 'none';
 
+    const passwordConfirm = document.getElementById('reg-password-confirm') ? document.getElementById('reg-password-confirm').value : password;
     if (!name || !nip || !school) {
       errEl.textContent = 'Nama, NIP, dan Sekolah wajib diisi.';
       errEl.style.display = 'block';
       return;
     }
 
+    if (password && password !== passwordConfirm) {
+      errEl.textContent = 'Konfirmasi password tidak cocok.';
+      errEl.style.display = 'block';
+      return;
+    }
     const btn = document.getElementById('btn-do-register');
     btn.disabled = true; btn.textContent = 'Mendaftarkan...';
 
@@ -2072,7 +2105,22 @@ Catatan: Laporan ini dibuat otomatis secara resmi oleh sistem *KoreksiSoal*. Ter
     if (!student) return;
 
     // Populates printing targets
-    document.getElementById('pdf-school-header').innerText = this.profile.school.toUpperCase();
+    // Build kop header from profile kop settings
+    const kopEl = document.getElementById('pdf-kop-header');
+    if (kopEl) {
+      kopEl.innerHTML = this.buildKopHtml({
+        title: this.profile.reportHeaderTitle || '',
+        schoolName: this.profile.reportHeaderSchoolName || this.profile.school || '',
+        address: this.profile.reportHeaderAddress || '',
+        city: this.profile.reportHeaderCity || '',
+        phone: this.profile.reportHeaderPhone || '',
+        email: this.profile.reportHeaderEmail || '',
+        website: this.profile.reportHeaderWebsite || '',
+        logo: this.profile.reportLogoBase64 || ''
+      });
+    }
+    // Update city in signature section
+    const cityName = this.profile.reportHeaderCity ? this.profile.reportHeaderCity.split(',')[0].trim() : 'Jakarta';
     document.getElementById('pdf-student-name').innerText = student.name;
     document.getElementById('pdf-student-nisn').innerText = student.nisn;
     document.getElementById('pdf-student-class').innerText = `${student.className} / ${student.major}`;
@@ -2086,7 +2134,7 @@ Catatan: Laporan ini dibuat otomatis secara resmi oleh sistem *KoreksiSoal*. Ter
     // Get current date
     const dateOpts = { day: 'numeric', month: 'long', year: 'numeric' };
     const dateFormatted = new Date().toLocaleDateString('id-ID', dateOpts);
-    document.getElementById('pdf-date-location').innerHTML = `Jakarta, ${dateFormatted}<br>Guru Mata Pelajaran`;
+    document.getElementById('pdf-date-location').innerHTML = `${cityName}, ${dateFormatted}<br>Guru Mata Pelajaran`;
 
     // Fetch grades rows
     const tbody = document.getElementById('pdf-grades-tbody');
@@ -2150,10 +2198,22 @@ Catatan: Laporan ini dibuat otomatis secara resmi oleh sistem *KoreksiSoal*. Ter
      SETTINGS & PROFILE CONTROLLER
      ========================================================================== */
   renderSettings() {
-    document.getElementById('setting-name').value = this.profile.name;
-    document.getElementById('setting-nip').value = this.profile.nip;
-    document.getElementById('setting-school').value = this.profile.school;
-    document.getElementById('setting-year').value = this.profile.academicYear;
+    document.getElementById('setting-name').value = this.profile.name || '';
+    document.getElementById('setting-nip').value = this.profile.nip || '';
+    document.getElementById('setting-school').value = this.profile.school || '';
+    document.getElementById('setting-year').value = this.profile.academicYear || '2025/2026';
+
+    // Render Kop Raport fields
+    const p = this.profile;
+    const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
+    setVal('kop-title', p.reportHeaderTitle);
+    setVal('kop-school-name', p.reportHeaderSchoolName || p.school);
+    setVal('kop-address', p.reportHeaderAddress);
+    setVal('kop-city', p.reportHeaderCity);
+    setVal('kop-phone', p.reportHeaderPhone);
+    setVal('kop-email', p.reportHeaderEmail);
+    setVal('kop-website', p.reportHeaderWebsite);
+    this.updateKopPreview();
 
     // Load avatar previews
     const grid = document.getElementById('avatar-grid-container');
@@ -2244,7 +2304,7 @@ Catatan: Laporan ini dibuat otomatis secara resmi oleh sistem *KoreksiSoal*. Ter
 
     this.saveState();
     DB.saveProfile(this.profile).then(() => {
-      this.showToast('Profil berhasil disimpan!', 'success');
+      this.showToast('Profil berhasil disimpan! ✅', 'success');
     }).catch(err => this.showToast('Gagal simpan profil: ' + err.message, 'error'));
     this.logActivity('Mengupdate detail profil guru');
     this.renderHeaderProfile();
@@ -2386,6 +2446,199 @@ Catatan: Laporan ini dibuat otomatis secara resmi oleh sistem *KoreksiSoal*. Ter
     const formProfile = document.getElementById('profile-form');
     if (formProfile) {
       formProfile.addEventListener('submit', (e) => this.saveProfile(e));
+    }
+
+    // 10. Logout buttons
+    const btnHeaderLogout = document.getElementById('btn-header-logout');
+    if (btnHeaderLogout) btnHeaderLogout.addEventListener('click', () => this.showLogoutModal());
+
+    const btnSettingsLogout = document.getElementById('btn-logout-settings');
+    if (btnSettingsLogout) btnSettingsLogout.addEventListener('click', () => this.showLogoutModal());
+
+    const btnCancelLogout = document.getElementById('btn-cancel-logout');
+    if (btnCancelLogout) btnCancelLogout.addEventListener('click', () => this.hideLogoutModal());
+
+    const btnCloseLogout = document.getElementById('close-logout-modal');
+    if (btnCloseLogout) btnCloseLogout.addEventListener('click', () => this.hideLogoutModal());
+
+    const btnConfirmLogout = document.getElementById('btn-confirm-logout');
+    if (btnConfirmLogout) btnConfirmLogout.addEventListener('click', () => {
+      this.hideLogoutModal();
+      this.logout();
+    });
+
+    // 11. Settings tabs
+    document.querySelectorAll('.settings-tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tabId = btn.getAttribute('data-tab');
+        document.querySelectorAll('.settings-tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.settings-tab-content').forEach(t => t.classList.remove('active'));
+        btn.classList.add('active');
+        const tabEl = document.getElementById(tabId);
+        if (tabEl) tabEl.classList.add('active');
+      });
+    });
+
+    // 12. Password change form
+    const formChangePw = document.getElementById('change-password-form');
+    if (formChangePw) {
+      formChangePw.addEventListener('submit', (e) => this.handleChangePassword(e));
+    }
+
+    // Toggle password visibility buttons
+    document.querySelectorAll('.toggle-pw-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const targetId = btn.getAttribute('data-target');
+        const input = document.getElementById(targetId);
+        if (!input) return;
+        if (input.type === 'password') {
+          input.type = 'text';
+          btn.innerHTML = '<i data-lucide="eye-off"></i>';
+        } else {
+          input.type = 'password';
+          btn.innerHTML = '<i data-lucide="eye"></i>';
+        }
+        lucide.createIcons();
+      });
+    });
+
+    // 13. Kop Raport form
+    const formKop = document.getElementById('kop-form');
+    if (formKop) {
+      formKop.addEventListener('submit', (e) => this.saveKopRaport(e));
+    }
+
+    const btnPreviewKop = document.getElementById('btn-preview-kop');
+    if (btnPreviewKop) btnPreviewKop.addEventListener('click', () => this.updateKopPreview());
+
+    // Kop logo upload
+    const kopLogoUpload = document.getElementById('kop-logo-upload');
+    if (kopLogoUpload) {
+      kopLogoUpload.addEventListener('change', (e) => this.uploadKopLogo(e));
+    }
+  }
+
+  // ============================================================
+  // KOP RAPORT METHODS
+  // ============================================================
+
+  uploadKopLogo(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    if (file.size > 1024 * 512) { // 512KB limit for logo
+      this.showToast('Ukuran logo terlalu besar! Maksimal 512KB.', 'error');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      this.profile.reportLogoBase64 = e.target.result;
+      this.showToast('Logo berhasil diunggah!', 'success');
+      this.updateKopPreview();
+    };
+    reader.readAsDataURL(file);
+  }
+
+  saveKopRaport(e) {
+    e.preventDefault();
+    this.profile.reportHeaderTitle    = document.getElementById('kop-title').value.trim();
+    this.profile.reportHeaderSchoolName = document.getElementById('kop-school-name').value.trim();
+    this.profile.reportHeaderAddress  = document.getElementById('kop-address').value.trim();
+    this.profile.reportHeaderCity     = document.getElementById('kop-city').value.trim();
+    this.profile.reportHeaderPhone    = document.getElementById('kop-phone').value.trim();
+    this.profile.reportHeaderEmail    = document.getElementById('kop-email').value.trim();
+    this.profile.reportHeaderWebsite  = document.getElementById('kop-website').value.trim();
+
+    DB.saveProfile(this.profile).then(() => {
+      this.showToast('Kop raport berhasil disimpan! ✅', 'success');
+    }).catch(err => this.showToast('Gagal simpan kop: ' + err.message, 'error'));
+    this.logActivity('Memperbarui kop raport PDF');
+    this.updateKopPreview();
+  }
+
+  updateKopPreview() {
+    const container = document.getElementById('kop-preview-inner');
+    if (!container) return;
+
+    const title = document.getElementById('kop-title') ? document.getElementById('kop-title').value : (this.profile.reportHeaderTitle || '');
+    const schoolName = document.getElementById('kop-school-name') ? document.getElementById('kop-school-name').value : (this.profile.reportHeaderSchoolName || this.profile.school || '');
+    const address = document.getElementById('kop-address') ? document.getElementById('kop-address').value : (this.profile.reportHeaderAddress || '');
+    const city = document.getElementById('kop-city') ? document.getElementById('kop-city').value : (this.profile.reportHeaderCity || '');
+    const phone = document.getElementById('kop-phone') ? document.getElementById('kop-phone').value : (this.profile.reportHeaderPhone || '');
+    const email = document.getElementById('kop-email') ? document.getElementById('kop-email').value : (this.profile.reportHeaderEmail || '');
+    const website = document.getElementById('kop-website') ? document.getElementById('kop-website').value : (this.profile.reportHeaderWebsite || '');
+    const logo = this.profile.reportLogoBase64;
+
+    container.innerHTML = this.buildKopHtml({ title, schoolName, address, city, phone, email, website, logo });
+  }
+
+  buildKopHtml({ title, schoolName, address, city, phone, email, website, logo }) {
+    const logoHtml = logo
+      ? `<img src="${logo}" style="width:70px;height:70px;object-fit:contain;flex-shrink:0;" alt="Logo Sekolah">`
+      : `<div style="width:70px;height:70px;border:2px dashed #aaa;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:0.6rem;color:#999;text-align:center;">Logo<br>Sekolah</div>`;
+
+    const contact = [
+      phone ? `📞 ${phone}` : '',
+      email ? `✉ ${email}` : '',
+      website ? `🌐 ${website}` : ''
+    ].filter(Boolean).join(' | ');
+
+    return `
+      <div style="display:flex;align-items:center;gap:1rem;padding-bottom:0.75rem;border-bottom:3px double #000;">
+        ${logoHtml}
+        <div style="flex:1;text-align:center;">
+          ${title ? `<p style="font-size:0.8rem;font-weight:600;margin-bottom:2px;text-transform:uppercase;">${title}</p>` : ''}
+          <p style="font-size:1.1rem;font-weight:800;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:2px;">${schoolName || '(Nama Sekolah)'}</p>
+          ${address ? `<p style="font-size:0.78rem;">${address}${city ? ', ' + city : ''}</p>` : ''}
+          ${contact ? `<p style="font-size:0.75rem;color:#555;">${contact}</p>` : ''}
+        </div>
+      </div>
+    `;
+  }
+
+  // ============================================================
+  // PASSWORD CHANGE
+  // ============================================================
+
+  async handleChangePassword(e) {
+    e.preventDefault();
+    const oldPw = document.getElementById('old-password').value;
+    const newPw = document.getElementById('new-password').value;
+    const confirmPw = document.getElementById('confirm-password').value;
+    const errEl = document.getElementById('pw-change-error');
+    const succEl = document.getElementById('pw-change-success');
+    errEl.style.display = 'none';
+    succEl.style.display = 'none';
+
+    if (!newPw) {
+      errEl.textContent = 'Password baru tidak boleh kosong.';
+      errEl.style.display = 'block';
+      return;
+    }
+    if (newPw.length < 6) {
+      errEl.textContent = 'Password baru minimal 6 karakter.';
+      errEl.style.display = 'block';
+      return;
+    }
+    if (newPw !== confirmPw) {
+      errEl.textContent = 'Konfirmasi password tidak cocok.';
+      errEl.style.display = 'block';
+      return;
+    }
+
+    try {
+      const result = await DB.changePassword(oldPw, newPw);
+      if (result.success) {
+        succEl.textContent = 'Password berhasil diubah! ✅';
+        succEl.style.display = 'block';
+        document.getElementById('change-password-form').reset();
+        this.logActivity('Mengubah password login');
+      } else {
+        errEl.textContent = result.error || 'Gagal mengubah password.';
+        errEl.style.display = 'block';
+      }
+    } catch(err) {
+      errEl.textContent = err.message;
+      errEl.style.display = 'block';
     }
   }
 }

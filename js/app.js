@@ -83,8 +83,38 @@ class KoreksiSoalApp {
       this.profile    = profile    || { ...DEFAULT_PROFILE };
       this.students   = students   || [];
       this.exams      = exams      || [];
-      this.submissions= submissions|| [];
       this.activities = activities || [];
+
+      // ── Deduplikasi submission ────────────────────────────────────────────
+      // Akibat bug lama (Date.now() collision di syncSubmissions), bisa ada
+      // beberapa submission dengan examId+studentId yang sama. Simpan yang
+      // paling relevan (status terbaik: Selesai > Proses > Belum), dan
+      // buang duplikat agar semua siswa muncul di menu koreksi.
+      const rawSubs = submissions || [];
+      const subMap  = new Map();   // key: `${examId}||${studentId}`
+      const statusRank = { 'Selesai': 3, 'Proses': 2, 'Belum': 1 };
+      rawSubs.forEach(sub => {
+        const key = `${sub.examId}||${sub.studentId}`;
+        if (!subMap.has(key)) {
+          subMap.set(key, sub);
+        } else {
+          const existing = subMap.get(key);
+          // Pertahankan yang lebih baik statusnya; jika sama, yang totalScore-nya lebih tinggi
+          const rankNew = statusRank[sub.status] || 0;
+          const rankOld = statusRank[existing.status] || 0;
+          if (rankNew > rankOld || (rankNew === rankOld && (sub.totalScore || 0) > (existing.totalScore || 0))) {
+            subMap.set(key, sub);
+          }
+        }
+      });
+      this.submissions = Array.from(subMap.values());
+
+      // Jika ada duplikat yang dibersihkan, perbarui juga di storage
+      if (this.submissions.length < rawSubs.length) {
+        console.info(`[loadAllData] Deduplikasi: ${rawSubs.length - this.submissions.length} submission duplikat dihapus.`);
+        DB.saveManySubmissions(this.submissions).catch(console.error);
+      }
+      // ─────────────────────────────────────────────────────────────────────
 
       // Tampilkan badge mode di header
       this.renderDbModeBadge();
@@ -400,6 +430,10 @@ class KoreksiSoalApp {
   // Create empty/uncompleted submission entries for students who don't have them yet
   syncSubmissions() {
     const newSubs = [];
+    // Counter unik per panggilan syncSubmissions agar ID tidak bentrok
+    // meski loop berjalan dalam milidetik yang sama
+    let subCounter = 0;
+
     this.exams.forEach(exam => {
       const targetStudents = this.students.filter(s => s.className === exam.className);
       targetStudents.forEach(student => {
@@ -411,8 +445,13 @@ class KoreksiSoalApp {
             answers[q.id] = q.type === 'PGK' ? [] : '';
             scores[q.id] = 0;
           });
+          subCounter++;
+          // ID deterministik: gabungan examId + studentId + counter
+          // Menghindari collision saat Date.now() sama di semua iterasi loop
+          const safeExamId   = exam.id.replace(/[^a-zA-Z0-9]/g, '');
+          const safeStudId   = student.id.replace(/[^a-zA-Z0-9]/g, '');
           const newSub = {
-            id: `sub-gen-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+            id: `sub-${safeExamId}-${safeStudId}-${subCounter}`,
             examId: exam.id,
             studentId: student.id,
             answers,
@@ -427,7 +466,14 @@ class KoreksiSoalApp {
       });
     });
     if (newSubs.length > 0) {
-      newSubs.forEach(sub => DB.saveSubmission(sub).catch(console.error));
+      // Simpan semua sekaligus jika memungkinkan; fallback satu per satu
+      DB.saveManySubmissions
+        ? DB.saveManySubmissions(newSubs).catch(err => {
+            // Jika saveManySubmissions gagal (misal: online mode tidak support batch),
+            // fallback ke simpan satu per satu
+            newSubs.forEach(sub => DB.saveSubmission(sub).catch(console.error));
+          })
+        : newSubs.forEach(sub => DB.saveSubmission(sub).catch(console.error));
     }
   }
 

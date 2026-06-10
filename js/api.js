@@ -440,7 +440,15 @@ const DB = {
 
   async saveManySubmissions(submissions) {
     if (!this.isOnline()) {
-      localStorage.setItem('ks_submissions', JSON.stringify(submissions));
+      // Perbaikan: merge ke data yang sudah ada, jangan timpa seluruh array
+      const existing = await this.getSubmissions();
+      const merged = [...existing];
+      submissions.forEach(newSub => {
+        const idx = merged.findIndex(s => s.id === newSub.id);
+        if (idx >= 0) merged[idx] = newSub;
+        else merged.push(newSub);
+      });
+      localStorage.setItem('ks_submissions', JSON.stringify(merged));
       return { success: true };
     }
     return KS_API.saveMany(KS_API.SHEETS.SUBMISSIONS, submissions);

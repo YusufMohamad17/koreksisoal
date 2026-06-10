@@ -540,9 +540,7 @@ textarea.form-input { resize: vertical; }
 
   .custom-table th, .custom-table td { padding: 0.7rem 0.75rem; font-size: 0.85rem; }
 
-  /* Make sure dashboard bottom cards don't grow too tall on mobile */
-  #pending-correction-table thead tr th:nth-child(3),
-  #pending-correction-table tbody tr td:nth-child(3) { display: none; }
+
 
 }
 
@@ -725,28 +723,70 @@ textarea.form-input { resize: vertical; }
 }
 
 /* =============================================
-   DASHBOARD BOTTOM CARDS — COMPACT & EQUAL HEIGHT
+   DASHBOARD BOTTOM CARDS — AUTO HEIGHT, MOBILE FIRST
    ============================================= */
+
+/* Desktop: kartu sejajar, tinggi otomatis tapi dibatasi agar tidak terlalu panjang */
 #view-dashboard .grid-cols-2.mt-4 {
   align-items: start;
 }
 #view-dashboard .grid-cols-2.mt-4 .card {
-  max-height: 320px;
   display: flex;
   flex-direction: column;
 }
 #view-dashboard .grid-cols-2.mt-4 .table-container {
   overflow-y: auto;
-  max-height: 230px;
+  max-height: 220px;
   flex: 1;
 }
-/* On mobile, stack and constrain height more */
+
+/* Mobile: setiah kartu tampil compact — tabel dibatasi 3 baris */
 @media (max-width: 768px) {
-  #view-dashboard .grid-cols-2.mt-4 .card {
-    max-height: 260px;
+  /* Grid sudah jadi 1 kolom, buat kartu ini terasa serasi dengan stat-card */
+  #view-dashboard .grid-cols-2.mt-4 {
+    grid-template-columns: 1fr !important;
+    gap: 0.75rem;
   }
+
+  #view-dashboard .grid-cols-2.mt-4 .card {
+    /* Tinggi otomatis sesuai konten, max setara 4-5 baris tabel */
+    max-height: none;
+    height: auto;
+  }
+
+  /* Batasi tabel hanya 3 baris pertama agar kartu tidak membengkak */
   #view-dashboard .grid-cols-2.mt-4 .table-container {
-    max-height: 180px;
+    max-height: 160px;
+    overflow-y: auto;
+  }
+
+  /* Sembunyikan kolom yang tidak kritis agar tabel muat di layar sempit */
+  #pending-correction-table th:nth-child(3),
+  #pending-correction-table td:nth-child(3) { display: none; }
+
+  #class-summary-table th:nth-child(2),
+  #class-summary-table td:nth-child(2),
+  #class-summary-table th:nth-child(4),
+  #class-summary-table td:nth-child(4) { display: none; }
+
+  /* Card title lebih kompak */
+  #view-dashboard .grid-cols-2.mt-4 .card-title-container {
+    margin-bottom: 0.5rem;
+  }
+  #view-dashboard .grid-cols-2.mt-4 .card-title {
+    font-size: 0.88rem;
+  }
+}
+
+/* Very small screens */
+@media (max-width: 480px) {
+  #view-dashboard .grid-cols-2.mt-4 .table-container {
+    max-height: 130px;
+  }
+  #view-dashboard .grid-cols-2.mt-4 .custom-table th,
+  #view-dashboard .grid-cols-2.mt-4 .custom-table td {
+    padding: 0.5rem 0.6rem;
+    font-size: 0.78rem;
   }
 }
 

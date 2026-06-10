@@ -4,6 +4,12 @@
  * Versi Online: menggunakan Google Apps Script + Spreadsheet sebagai database
  */
 
+// Helper function to safely compare class names (handles numbers from Google Sheets)
+function compareClassNames(c1, c2) {
+  if (c1 === undefined || c1 === null || c2 === undefined || c2 === null) return false;
+  return String(c1).trim().toLowerCase() === String(c2).trim().toLowerCase();
+}
+
 class KoreksiSoalApp {
   constructor() {
     this.profile = {};
@@ -402,8 +408,7 @@ class KoreksiSoalApp {
     const newSubs = [];
     this.exams.forEach(exam => {
       const targetStudents = this.students.filter(s => 
-        s.className && exam.className &&
-        s.className.trim().toLowerCase() === exam.className.trim().toLowerCase()
+        compareClassNames(s.className, exam.className)
       );
       targetStudents.forEach(student => {
         const exists = this.submissions.some(sub => sub.examId === exam.id && sub.studentId === student.id);
@@ -603,7 +608,7 @@ class KoreksiSoalApp {
     // Count expected submissions: for each exam, count number of students in that class
     let expectedCount = 0;
     this.exams.forEach(ex => {
-      const studentCount = this.students.filter(s => s.className === ex.className).length;
+      const studentCount = this.students.filter(s => compareClassNames(s.className, ex.className)).length;
       expectedCount += studentCount;
     });
 
@@ -699,12 +704,12 @@ class KoreksiSoalApp {
       classSummaryBody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Belum ada data kelas.</td></tr>';
     } else {
       classes.forEach(cls => {
-        const classStudents = this.students.filter(s => s.className === cls);
+        const classStudents = this.students.filter(s => compareClassNames(s.className, cls));
         
         // Average score for this class
         const classSubs = this.submissions.filter(sub => {
           const student = this.students.find(s => s.id === sub.studentId);
-          return student && student.className === cls && sub.status === 'Selesai';
+          return student && compareClassNames(student.className, cls) && sub.status === 'Selesai';
         });
 
         let classAvg = '-';
@@ -714,10 +719,10 @@ class KoreksiSoalApp {
         }
 
         // Completion status
-        const totalExpectedClass = this.exams.filter(e => e.className === cls).length * classStudents.length;
+        const totalExpectedClass = this.exams.filter(e => compareClassNames(e.className, cls)).length * classStudents.length;
         const totalCompletedClass = this.submissions.filter(sub => {
           const student = this.students.find(s => s.id === sub.studentId);
-          return student && student.className === cls && sub.status === 'Selesai';
+          return student && compareClassNames(student.className, cls) && sub.status === 'Selesai';
         }).length;
         
         const complPercent = totalExpectedClass > 0 ? Math.round((totalCompletedClass / totalExpectedClass) * 100) : 0;
@@ -848,7 +853,7 @@ class KoreksiSoalApp {
     const filteredExams = this.exams.filter(ex => 
       ex.name.toLowerCase().includes(searchVal) || 
       ex.subject.toLowerCase().includes(searchVal) ||
-      ex.className.toLowerCase().includes(searchVal)
+      String(ex.className).toLowerCase().includes(searchVal)
     );
 
     if (filteredExams.length === 0) {
@@ -1308,8 +1313,8 @@ class KoreksiSoalApp {
 
     // Filter list
     const filtered = this.students.filter(student => {
-      const matchesSearch = student.name.toLowerCase().includes(searchVal) || student.nisn.includes(searchVal);
-      const matchesClass = activeFilter === 'Semua' || student.className === activeFilter;
+      const matchesSearch = student.name.toLowerCase().includes(searchVal) || String(student.nisn).includes(searchVal);
+      const matchesClass = activeFilter === 'Semua' || compareClassNames(student.className, activeFilter);
       return matchesSearch && matchesClass;
     });
 
@@ -1493,7 +1498,7 @@ class KoreksiSoalApp {
       if (!student || !exam) return false;
 
       const matchExam = !selectedExam || sub.examId === selectedExam;
-      const matchClass = !selectedClass || (student.className && student.className.trim().toLowerCase() === selectedClass.trim().toLowerCase());
+      const matchClass = !selectedClass || compareClassNames(student.className, selectedClass);
       const matchStatus = !selectedStatus || sub.status === selectedStatus;
 
       return matchExam && matchClass && matchStatus;
@@ -1978,7 +1983,7 @@ class KoreksiSoalApp {
     if (!exam) return;
 
     // Gather metrics for WhatsApp Text
-    const classStudents = this.students.filter(s => s.className === exam.className);
+    const classStudents = this.students.filter(s => compareClassNames(s.className, exam.className));
     const examSubmissions = this.submissions.filter(s => s.examId === exam.id);
     const completed = examSubmissions.filter(s => s.status === 'Selesai');
     
@@ -2074,7 +2079,7 @@ Catatan: Laporan ini dibuat otomatis secara resmi oleh sistem *KoreksiSoal*. Ter
     }
 
     // Get students in this class
-    const classStudents = this.students.filter(s => s.className === classVal).sort((a,b) => a.name.localeCompare(b.name));
+    const classStudents = this.students.filter(s => compareClassNames(s.className, classVal)).sort((a,b) => a.name.localeCompare(b.name));
     if (classStudents.length === 0) {
       alert('Tidak ada siswa di kelas tersebut.');
       return;
@@ -2087,7 +2092,7 @@ Catatan: Laporan ini dibuat otomatis secara resmi oleh sistem *KoreksiSoal*. Ter
     const examMap = []; // references to exams that are columns
 
     selectedSubjects.forEach(sub => {
-      const subExams = this.exams.filter(e => e.className === classVal && e.subject === sub);
+      const subExams = this.exams.filter(e => compareClassNames(e.className, classVal) && e.subject === sub);
       subExams.forEach(ex => {
         columns.push(`${ex.subject} - ${ex.name}`);
         examMap.push(ex);
@@ -2183,7 +2188,7 @@ Catatan: Laporan ini dibuat otomatis secara resmi oleh sistem *KoreksiSoal*. Ter
     tbody.innerHTML = '';
 
     // Find all exams matching the student's class
-    const studentExams = this.exams.filter(e => e.className === student.className);
+    const studentExams = this.exams.filter(e => compareClassNames(e.className, student.className));
     
     if (studentExams.length === 0) {
       tbody.innerHTML = '<tr><td colspan="5" style="border: 1px solid black; padding: 10px; text-align: center; font-style:italic;">Belum ada pelaksanaan ujian untuk kelas siswa ini.</td></tr>';

@@ -424,8 +424,14 @@ const DB = {
       return saved ? JSON.parse(saved) : [];
     }
     const result = await KS_API.getAll(KS_API.SHEETS.EXAMS);
-    localStorage.setItem('ks_exams', JSON.stringify(result.data));
-    return result.data;
+    const exams = (result.data || []).map(ex => {
+      if (typeof ex.questions === 'string') {
+        try { ex.questions = JSON.parse(ex.questions); } catch(e) { ex.questions = []; }
+      }
+      return ex;
+    });
+    localStorage.setItem('ks_exams', JSON.stringify(exams));
+    return exams;
   },
 
   async saveExam(exam) {
@@ -459,8 +465,17 @@ const DB = {
       return saved ? JSON.parse(saved) : [];
     }
     const result = await KS_API.getAll(KS_API.SHEETS.SUBMISSIONS);
-    localStorage.setItem('ks_submissions', JSON.stringify(result.data));
-    return result.data;
+    const submissions = (result.data || []).map(sub => {
+      if (typeof sub.answers === 'string') {
+        try { sub.answers = JSON.parse(sub.answers); } catch(e) { sub.answers = {}; }
+      }
+      if (typeof sub.scores === 'string') {
+        try { sub.scores = JSON.parse(sub.scores); } catch(e) { sub.scores = {}; }
+      }
+      return sub;
+    });
+    localStorage.setItem('ks_submissions', JSON.stringify(submissions));
+    return submissions;
   },
 
   async saveSubmission(submission) {

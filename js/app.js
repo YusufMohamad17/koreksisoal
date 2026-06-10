@@ -401,7 +401,10 @@ class KoreksiSoalApp {
   syncSubmissions() {
     const newSubs = [];
     this.exams.forEach(exam => {
-      const targetStudents = this.students.filter(s => s.className === exam.className);
+      const targetStudents = this.students.filter(s => 
+        s.className && exam.className &&
+        s.className.trim().toLowerCase() === exam.className.trim().toLowerCase()
+      );
       targetStudents.forEach(student => {
         const exists = this.submissions.some(sub => sub.examId === exam.id && sub.studentId === student.id);
         if (!exists) {
@@ -440,7 +443,29 @@ class KoreksiSoalApp {
     }
   }
 
-  logActivity(text) {
+  // Sinkronisasi manual: reload semua data dari DB lalu sync submission
+  async manualSyncSubmissions() {
+    this.showGlobalLoader('Menyinkronisasi data siswa...');
+    try {
+      const [students, exams, submissions] = await Promise.all([
+        DB.getStudents(),
+        DB.getExams(),
+        DB.getSubmissions()
+      ]);
+      this.students    = students    || [];
+      this.exams       = exams       || [];
+      this.submissions = submissions || [];
+      this.syncSubmissions();
+      this.renderCorrections();
+      this.showToast('Sinkronisasi berhasil! Lembar jawaban diperbarui.', 'success');
+    } catch (err) {
+      this.showToast('Gagal sinkronisasi: ' + err.message, 'error');
+    } finally {
+      this.hideGlobalLoader();
+    }
+  }
+
+
     const newActivity = {
       id: `act-${Date.now()}`,
       text,
@@ -1361,7 +1386,7 @@ class KoreksiSoalApp {
     modal.classList.remove('active');
   }
 
-  saveStudent() {
+  async saveStudent() {
     const studentId = document.getElementById('form-student-id').value;
     const name = document.getElementById('form-student-name').value.trim();
     const nisn = document.getElementById('form-student-nisn').value.trim();
@@ -1401,7 +1426,14 @@ class KoreksiSoalApp {
     const studentToSave = studentId
       ? this.students.find(s => s.id === studentId)
       : this.students[this.students.length - 1];
-    DB.saveStudent(studentToSave).catch(err => this.showToast('Gagal simpan siswa: ' + err.message, 'error'));
+
+    // Await save agar siswa sudah tersimpan sebelum syncSubmissions dijalankan
+    // (mencegah race condition: submission dibuat sebelum siswa terdaftar di DB)
+    try {
+      await DB.saveStudent(studentToSave);
+    } catch (err) {
+      this.showToast('Gagal simpan siswa: ' + err.message, 'error');
+    }
     this.syncSubmissions();
     this.closeStudentModal();
     this.renderStudents();
@@ -1461,7 +1493,7 @@ class KoreksiSoalApp {
       if (!student || !exam) return false;
 
       const matchExam = !selectedExam || sub.examId === selectedExam;
-      const matchClass = !selectedClass || student.className === selectedClass;
+      const matchClass = !selectedClass || (student.className && student.className.trim().toLowerCase() === selectedClass.trim().toLowerCase());
       const matchStatus = !selectedStatus || sub.status === selectedStatus;
 
       return matchExam && matchClass && matchStatus;
